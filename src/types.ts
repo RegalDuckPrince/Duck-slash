@@ -3,10 +3,24 @@
 // ============================================================
 
 export type EnemyType = 'goose' | 'crow' | 'zombie_chicken' | 'boss';
-export type GameState = 'menu' | 'char_select' | 'playing' | 'wave_complete' | 'game_over' | 'victory';
+export type GameState = 'menu' | 'char_select' | 'playing' | 'wave_complete' | 'skill_tree' | 'game_over' | 'victory';
 export type EnemyState = 'idle' | 'chase' | 'attack' | 'stagger' | 'dying' | 'dead';
 export type CharacterType = 'duck' | 'penguin' | 'parrot';
-export type WeaponType = 'sword' | 'axe' | 'spear' | 'dagger' | 'mace';
+export type WeaponType =
+  | 'sword' | 'axe' | 'spear' | 'dagger' | 'mace'
+  | 'pistol' | 'shotgun' | 'rifle' | 'sniper' | 'uzi' | 'minigun' | 'cannon' | 'burst_rifle';
+
+export type SkillId =
+  | 'sharp_claws' | 'duck_boost' | 'iron_feathers'
+  | 'swift_wings' | 'long_reach' | 'lifesteal'
+  | 'armor' | 'battle_frenzy' | 'double_shot';
+
+export interface SkillDef {
+  id: SkillId;
+  label: string;
+  description: string;
+  emoji: string;
+}
 
 export interface Vec2 {
   x: number;
@@ -107,6 +121,16 @@ export interface Projectile {
   fromEnemy: boolean;
 }
 
+// ── HP Drop ──────────────────────────────────────────────────
+
+export interface HpDrop {
+  x: number;
+  y: number;
+  hp: number;
+  alpha: number;
+  pulseTimer: number;
+}
+
 // ── Scene decoration ─────────────────────────────────────────
 
 export interface Flower {
@@ -157,6 +181,10 @@ export interface WeaponConfig {
   damageMult: number;
   cooldownMult: number;
   rangeMult: number;
+  isGun: boolean;
+  projectileSpeed?: number;
+  projectileCount?: number;
+  projectileSpread?: number;  // radians half-angle for spread
 }
 
 export const CHARACTER_CONFIGS: Record<CharacterType, CharacterConfig> = {
@@ -178,9 +206,30 @@ export const CHARACTER_CONFIGS: Record<CharacterType, CharacterConfig> = {
 };
 
 export const WEAPON_CONFIGS: Record<WeaponType, WeaponConfig> = {
-  sword:  { type: 'sword',  label: 'Sword',  emoji: '⚔️',  damageMult: 1.0,  cooldownMult: 1.0,  rangeMult: 1.0  },
-  axe:    { type: 'axe',    label: 'Axe',    emoji: '🪓',  damageMult: 1.65, cooldownMult: 1.5,  rangeMult: 0.85 },
-  spear:  { type: 'spear',  label: 'Spear',  emoji: '🗡️',  damageMult: 0.75, cooldownMult: 0.65, rangeMult: 1.5  },
-  dagger: { type: 'dagger', label: 'Dagger', emoji: '🔪',  damageMult: 0.55, cooldownMult: 0.38, rangeMult: 0.7  },
-  mace:   { type: 'mace',   label: 'Mace',   emoji: '🔨',  damageMult: 2.0,  cooldownMult: 2.2,  rangeMult: 0.9  },
+  sword:  { type: 'sword',  label: 'Sword',  emoji: '⚔️',  damageMult: 1.0,  cooldownMult: 1.0,  rangeMult: 1.0,  isGun: false },
+  axe:    { type: 'axe',    label: 'Axe',    emoji: '🪓',  damageMult: 1.65, cooldownMult: 1.5,  rangeMult: 0.85, isGun: false },
+  spear:  { type: 'spear',  label: 'Spear',  emoji: '🗡️',  damageMult: 0.75, cooldownMult: 0.65, rangeMult: 1.5,  isGun: false },
+  dagger: { type: 'dagger', label: 'Dagger', emoji: '🔪',  damageMult: 0.55, cooldownMult: 0.38, rangeMult: 0.7,  isGun: false },
+  mace:   { type: 'mace',   label: 'Mace',   emoji: '🔨',  damageMult: 2.0,  cooldownMult: 2.2,  rangeMult: 0.9,  isGun: false },
+  // ── Guns ──────────────────────────────────────────────────
+  pistol:      { type: 'pistol',      label: 'Pistol',       emoji: '🔫',  damageMult: 0.9,  cooldownMult: 0.7,  rangeMult: 1.0, isGun: true,  projectileSpeed: 14, projectileCount: 1, projectileSpread: 0 },
+  shotgun:     { type: 'shotgun',     label: 'Shotgun',      emoji: '💥',  damageMult: 0.55, cooldownMult: 1.6,  rangeMult: 0.6, isGun: true,  projectileSpeed: 10, projectileCount: 6, projectileSpread: 0.32 },
+  rifle:       { type: 'rifle',       label: 'Rifle',        emoji: '🎯',  damageMult: 1.2,  cooldownMult: 1.0,  rangeMult: 1.0, isGun: true,  projectileSpeed: 18, projectileCount: 1, projectileSpread: 0 },
+  sniper:      { type: 'sniper',      label: 'Sniper',       emoji: '🔭',  damageMult: 3.5,  cooldownMult: 2.8,  rangeMult: 1.0, isGun: true,  projectileSpeed: 28, projectileCount: 1, projectileSpread: 0 },
+  uzi:         { type: 'uzi',         label: 'Uzi',          emoji: '⚡',  damageMult: 0.35, cooldownMult: 0.22, rangeMult: 1.0, isGun: true,  projectileSpeed: 12, projectileCount: 1, projectileSpread: 0.08 },
+  minigun:     { type: 'minigun',     label: 'Minigun',      emoji: '🌀',  damageMult: 0.28, cooldownMult: 0.15, rangeMult: 1.0, isGun: true,  projectileSpeed: 13, projectileCount: 1, projectileSpread: 0.12 },
+  cannon:      { type: 'cannon',      label: 'Cannon',       emoji: '💣',  damageMult: 4.5,  cooldownMult: 3.5,  rangeMult: 1.0, isGun: true,  projectileSpeed: 8,  projectileCount: 1, projectileSpread: 0 },
+  burst_rifle: { type: 'burst_rifle', label: 'Burst Rifle',  emoji: '🔥',  damageMult: 0.8,  cooldownMult: 0.9,  rangeMult: 1.0, isGun: true,  projectileSpeed: 16, projectileCount: 3, projectileSpread: 0.06 },
+};
+
+export const SKILL_DEFS: Record<SkillId, SkillDef> = {
+  sharp_claws:   { id: 'sharp_claws',   label: 'Sharp Claws',      description: '+25% damage',                emoji: '🗡️'  },
+  duck_boost:    { id: 'duck_boost',    label: 'Duck Boost',       description: '+20% move speed',            emoji: '👟'  },
+  iron_feathers: { id: 'iron_feathers', label: 'Iron Feathers',    description: '+30 max HP & heal',          emoji: '🛡️'  },
+  swift_wings:   { id: 'swift_wings',   label: 'Swift Wings',      description: '-25% attack cooldown',       emoji: '🪽'  },
+  long_reach:    { id: 'long_reach',    label: 'Long Reach',       description: '+30% attack range',          emoji: '📏'  },
+  lifesteal:     { id: 'lifesteal',     label: 'Lifesteal',        description: 'Heal 8% of damage dealt',    emoji: '💉'  },
+  armor:         { id: 'armor',         label: 'Duck Tape Armor',  description: '-20% incoming damage',       emoji: '🦺'  },
+  battle_frenzy: { id: 'battle_frenzy', label: 'Battle Frenzy',    description: 'Combo window +50%',          emoji: '🔥'  },
+  double_shot:   { id: 'double_shot',   label: 'Double Shot',      description: 'Guns fire an extra bullet',  emoji: '🎱'  },
 };

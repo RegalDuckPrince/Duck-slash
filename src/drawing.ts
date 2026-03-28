@@ -3,8 +3,13 @@
 // ============================================================
 import type { EnemyType, BloodPool, BloodParticle, FeatherParticle, BodyPart,
   SlashTrail, FloatingText, Sparkle, Projectile, Flower, Cloud,
-  CharacterType, WeaponType } from './types.ts';
-import { CHARACTER_CONFIGS, WEAPON_CONFIGS } from './types.ts';
+  CharacterType, WeaponType, HpDrop, SkillId } from './types.ts';
+import { CHARACTER_CONFIGS, WEAPON_CONFIGS, SKILL_DEFS } from './types.ts';
+
+// ── Constants ─────────────────────────────────────────────────
+
+/** Angular frequency used for the player dance animation (radians per frame unit) */
+const DANCE_FREQ = 0.18;
 
 // ── Utility ──────────────────────────────────────────────────
 
@@ -122,6 +127,8 @@ export function drawPlayer(
   invincible: boolean,
   charType: CharacterType = 'duck',
   weaponType: WeaponType = 'sword',
+  isDancing = false,
+  danceFrame = 0,
 ) {
   ctx.save();
   ctx.translate(x, y);
@@ -133,7 +140,17 @@ export function drawPlayer(
 
   if (facing < 0) ctx.scale(-1, 1);
 
-  const bob = Math.sin(walkFrame * 0.18) * 2.5;
+  // Dance mode – exaggerated bobbing and spinning
+  if (isDancing) {
+    const dSpin = Math.sin(danceFrame * (DANCE_FREQ * 0.67)) * 0.35;
+    const dBounce = Math.abs(Math.sin(danceFrame * DANCE_FREQ)) * -12;
+    ctx.rotate(dSpin);
+    ctx.translate(Math.sin(danceFrame * (DANCE_FREQ * 0.5)) * 14, dBounce);
+  }
+
+  const bob = isDancing
+    ? Math.sin(danceFrame * DANCE_FREQ) * 5
+    : Math.sin(walkFrame * DANCE_FREQ) * 2.5;
 
   // Character colour palette
   let bodyColor1: string, bodyColor2: string, bodyOutline: string,
@@ -219,7 +236,9 @@ export function drawPlayer(
   }
 
   // Wing
-  const wf = isRolling ? 0.9 : Math.sin(walkFrame * 0.18) * 0.25;
+  const wf = isRolling ? 0.9
+    : isDancing ? -0.8 + Math.sin(danceFrame * DANCE_FREQ) * 0.5
+    : Math.sin(walkFrame * DANCE_FREQ) * 0.25;
   ctx.fillStyle = bodyColor2;
   ctx.save();
   ctx.translate(-8, 0 + bob);
@@ -346,6 +365,24 @@ export function drawPlayer(
     ctx.fillText(`${combo}x COMBO!`, x, y - 85);
     ctx.restore();
   }
+
+  // ── Dance music notes ────────────────────────────────────
+  if (isDancing) {
+    const notes = ['♪', '♫', '🎵', '♩'];
+    ctx.save();
+    ctx.font = 'bold 22px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    for (let n = 0; n < 4; n++) {
+      const angle = danceFrame * 0.04 + n * (Math.PI * 2 / 4);
+      const noteX = x + Math.cos(angle) * 55;
+      const noteY = y - 60 + Math.sin(angle * 0.7) * 20 - Math.abs(Math.sin(danceFrame * 0.06 + n)) * 30;
+      const noteAlpha = 0.5 + 0.5 * Math.sin(danceFrame * 0.1 + n);
+      ctx.globalAlpha = noteAlpha;
+      ctx.fillStyle = ['#ffe066', '#aaffcc', '#ff99cc', '#99ccff'][n % 4];
+      ctx.fillText(notes[n % notes.length], noteX, noteY);
+    }
+    ctx.restore();
+  }
 }
 
 function _drawSword(ctx: CanvasRenderingContext2D, scale: number) {
@@ -409,12 +446,168 @@ function _drawSword(ctx: CanvasRenderingContext2D, scale: number) {
 // Dispatch to correct weapon drawing
 function _drawWeapon(ctx: CanvasRenderingContext2D, weapon: WeaponType, scale: number) {
   switch (weapon) {
-    case 'axe':    _drawAxe(ctx, scale);    break;
-    case 'spear':  _drawSpear(ctx, scale);  break;
-    case 'dagger': _drawDagger(ctx, scale); break;
-    case 'mace':   _drawMace(ctx, scale);   break;
-    default:       _drawSword(ctx, scale);  break;
+    case 'axe':         _drawAxe(ctx, scale);         break;
+    case 'spear':       _drawSpear(ctx, scale);       break;
+    case 'dagger':      _drawDagger(ctx, scale);      break;
+    case 'mace':        _drawMace(ctx, scale);        break;
+    case 'pistol':      _drawPistol(ctx, scale);      break;
+    case 'shotgun':     _drawShotgun(ctx, scale);     break;
+    case 'rifle':       _drawRifle(ctx, scale);       break;
+    case 'sniper':      _drawSniper(ctx, scale);      break;
+    case 'uzi':         _drawUzi(ctx, scale);         break;
+    case 'minigun':     _drawMinigun(ctx, scale);     break;
+    case 'cannon':      _drawCannon(ctx, scale);      break;
+    case 'burst_rifle': _drawBurstRifle(ctx, scale);  break;
+    default:            _drawSword(ctx, scale);       break;
   }
+}
+
+// ── Gun drawing functions ────────────────────────────────────
+
+function _drawPistol(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save(); ctx.scale(scale, scale);
+  ctx.shadowColor = '#888'; ctx.shadowBlur = 6;
+  // barrel
+  ctx.fillStyle = '#444'; roundRect(ctx, -3, -40, 6, 28, 2); ctx.fill();
+  // grip
+  ctx.fillStyle = '#5a3010'; roundRect(ctx, -4, -14, 8, 18, 3); ctx.fill();
+  // trigger guard
+  ctx.strokeStyle = '#666'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(-2, -4, 7, 0.3, Math.PI - 0.3); ctx.stroke();
+  // muzzle shine
+  ctx.fillStyle = 'rgba(180,220,255,0.5)';
+  ctx.beginPath(); ctx.arc(0, -40, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0; ctx.restore();
+}
+
+function _drawShotgun(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save(); ctx.scale(scale, scale);
+  ctx.shadowColor = '#aa4400'; ctx.shadowBlur = 8;
+  // double barrel
+  ctx.fillStyle = '#555';
+  roundRect(ctx, -5, -70, 4, 56, 2); ctx.fill();
+  roundRect(ctx, 1, -70, 4, 56, 2); ctx.fill();
+  // stock
+  ctx.fillStyle = '#7a4420'; roundRect(ctx, -5, -14, 10, 24, 3); ctx.fill();
+  ctx.fillStyle = '#9a5428'; roundRect(ctx, -4, -10, 8, 10, 2); ctx.fill();
+  // shells hint
+  ctx.fillStyle = '#cc4400';
+  ctx.beginPath(); ctx.arc(-2, -16, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(2, -16, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0; ctx.restore();
+}
+
+function _drawRifle(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save(); ctx.scale(scale, scale);
+  ctx.shadowColor = '#336699'; ctx.shadowBlur = 8;
+  // barrel (long)
+  ctx.fillStyle = '#333'; roundRect(ctx, -2.5, -80, 5, 68, 2); ctx.fill();
+  // body
+  ctx.fillStyle = '#555'; roundRect(ctx, -4, -16, 8, 20, 2); ctx.fill();
+  // stock
+  ctx.fillStyle = '#7a4420'; roundRect(ctx, -4, 0, 9, 18, 3); ctx.fill();
+  // scope
+  ctx.fillStyle = '#222'; roundRect(ctx, -2, -60, 4, 14, 2); ctx.fill();
+  ctx.fillStyle = 'rgba(100,200,255,0.6)';
+  ctx.beginPath(); ctx.arc(0, -60, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0; ctx.restore();
+}
+
+function _drawSniper(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save(); ctx.scale(scale, scale);
+  ctx.shadowColor = '#00ccff'; ctx.shadowBlur = 12;
+  // very long barrel
+  ctx.fillStyle = '#2a2a2a'; roundRect(ctx, -2, -95, 4, 78, 2); ctx.fill();
+  // bipod hint
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(-6, -22); ctx.lineTo(0, -18); ctx.lineTo(6, -22); ctx.stroke();
+  // body
+  ctx.fillStyle = '#444'; roundRect(ctx, -4, -22, 8, 20, 2); ctx.fill();
+  // stock
+  ctx.fillStyle = '#5a3010'; roundRect(ctx, -4, -3, 9, 20, 3); ctx.fill();
+  // big scope
+  ctx.fillStyle = '#181818'; roundRect(ctx, -3, -72, 6, 20, 3); ctx.fill();
+  ctx.fillStyle = 'rgba(0,200,255,0.7)';
+  ctx.beginPath(); ctx.arc(0, -72, 4, 0, Math.PI * 2); ctx.fill();
+  // muzzle flash hint
+  ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 14;
+  ctx.fillStyle = 'rgba(0,200,255,0.4)';
+  ctx.beginPath(); ctx.arc(0, -95, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0; ctx.restore();
+}
+
+function _drawUzi(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save(); ctx.scale(scale, scale);
+  ctx.shadowColor = '#ff9900'; ctx.shadowBlur = 6;
+  // stubby barrel
+  ctx.fillStyle = '#333'; roundRect(ctx, -3, -38, 6, 22, 2); ctx.fill();
+  // boxy body
+  ctx.fillStyle = '#4a4a4a'; roundRect(ctx, -5, -18, 10, 16, 2); ctx.fill();
+  // grip / mag
+  ctx.fillStyle = '#666'; roundRect(ctx, -3, -4, 6, 18, 2); ctx.fill();
+  // mag clip detail
+  ctx.fillStyle = '#333'; roundRect(ctx, -2, 4, 4, 8, 1); ctx.fill();
+  ctx.shadowBlur = 0; ctx.restore();
+}
+
+function _drawMinigun(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save(); ctx.scale(scale, scale);
+  ctx.shadowColor = '#ffcc00'; ctx.shadowBlur = 12;
+  // 6 barrels rotated
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 3;
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 5, -20 + Math.sin(a) * 5);
+    ctx.lineTo(Math.cos(a) * 5, -70 + Math.sin(a) * 5);
+    ctx.stroke();
+  }
+  // center hub
+  ctx.fillStyle = '#333';
+  ctx.beginPath(); ctx.arc(0, -20, 8, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, -70, 6, 0, Math.PI * 2); ctx.fill();
+  // handle
+  ctx.fillStyle = '#5a3010'; roundRect(ctx, -4, -4, 8, 20, 3); ctx.fill();
+  ctx.shadowBlur = 0; ctx.restore();
+}
+
+function _drawCannon(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save(); ctx.scale(scale, scale);
+  ctx.shadowColor = '#cc4400'; ctx.shadowBlur = 14;
+  // fat barrel
+  const barrelGrad = ctx.createLinearGradient(-8, 0, 8, 0);
+  barrelGrad.addColorStop(0, '#555'); barrelGrad.addColorStop(0.5, '#888'); barrelGrad.addColorStop(1, '#444');
+  ctx.fillStyle = barrelGrad;
+  roundRect(ctx, -8, -68, 16, 52, 4); ctx.fill();
+  // muzzle ring
+  ctx.fillStyle = '#777'; roundRect(ctx, -9, -68, 18, 6, 3); ctx.fill();
+  // base
+  ctx.fillStyle = '#7a4420'; roundRect(ctx, -7, -18, 14, 22, 4); ctx.fill();
+  // cannonball hint
+  ctx.fillStyle = '#1a1a1a';
+  ctx.beginPath(); ctx.arc(0, -62, 6, 0, Math.PI * 2); ctx.fill();
+  ctx.shadowBlur = 0; ctx.restore();
+}
+
+function _drawBurstRifle(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save(); ctx.scale(scale, scale);
+  ctx.shadowColor = '#ff4400'; ctx.shadowBlur = 8;
+  // barrel
+  ctx.fillStyle = '#2a2a2a'; roundRect(ctx, -2.5, -75, 5, 56, 2); ctx.fill();
+  // flash hider
+  ctx.fillStyle = '#555'; roundRect(ctx, -3, -80, 6, 6, 1); ctx.fill();
+  // body
+  ctx.fillStyle = '#4a4a4a'; roundRect(ctx, -5, -20, 10, 18, 2); ctx.fill();
+  // foregrip
+  ctx.fillStyle = '#333'; roundRect(ctx, -3, -40, 6, 12, 2); ctx.fill();
+  // stock
+  ctx.fillStyle = '#363636'; roundRect(ctx, -4, -4, 10, 16, 3); ctx.fill();
+  // burst indicator dots
+  ctx.fillStyle = '#ff4400';
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath(); ctx.arc(3, -8 + i * 4, 1.5, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.shadowBlur = 0; ctx.restore();
 }
 
 function _drawAxe(ctx: CanvasRenderingContext2D, scale: number) {
@@ -1283,19 +1476,84 @@ export function drawProjectiles(ctx: CanvasRenderingContext2D, projectiles: Proj
     ctx.translate(p.x, p.y);
     const angle = Math.atan2(p.vy, p.vx);
     ctx.rotate(angle);
-    // Feather projectile
-    ctx.fillStyle = '#c0c0c0';
+
+    if (p.fromEnemy) {
+      // Feather projectile (enemy)
+      ctx.fillStyle = '#c0c0c0';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 12, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#888890';
+      ctx.beginPath();
+      ctx.moveTo(12, 0);
+      ctx.lineTo(20, -4);
+      ctx.lineTo(18, 0);
+      ctx.lineTo(20, 4);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      // Player bullet – glowing yellow/orange capsule
+      const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+      const len = Math.max(8, Math.min(speed * 2.5, 28));
+      ctx.shadowColor = '#ffcc00';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#ffe066';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, len * 0.5, 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // hot core
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, len * 0.25, 1.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.restore();
+  }
+}
+
+// ── HP drops ─────────────────────────────────────────────────
+
+export function drawHpDrops(ctx: CanvasRenderingContext2D, drops: HpDrop[]) {
+  for (const drop of drops) {
+    const pulse = 0.85 + 0.15 * Math.sin(drop.pulseTimer * 4);
+    ctx.save();
+    ctx.globalAlpha = drop.alpha;
+    ctx.translate(drop.x, drop.y);
+    ctx.scale(pulse, pulse);
+
+    // Glow
+    ctx.shadowColor = '#00ff88';
+    ctx.shadowBlur = 18;
+
+    // Heart shape
+    ctx.fillStyle = '#ff4477';
     ctx.beginPath();
-    ctx.ellipse(0, 0, 12, 3, 0, 0, Math.PI * 2);
+    ctx.moveTo(0, 3);
+    ctx.bezierCurveTo(-14, -6, -14, -18, 0, -10);
+    ctx.bezierCurveTo(14, -18, 14, -6, 0, 3);
     ctx.fill();
-    ctx.fillStyle = '#888890';
+    ctx.strokeStyle = '#ff88aa';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // White shine
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.beginPath();
-    ctx.moveTo(12, 0);
-    ctx.lineTo(20, -4);
-    ctx.lineTo(18, 0);
-    ctx.lineTo(20, 4);
-    ctx.closePath();
+    ctx.ellipse(-4, -12, 3, 2, -0.4, 0, Math.PI * 2);
     ctx.fill();
+
+    // HP text
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 11px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#aa0033';
+    ctx.lineWidth = 2;
+    ctx.strokeText(`+${drop.hp}`, 0, 18);
+    ctx.fillText(`+${drop.hp}`, 0, 18);
+
     ctx.restore();
   }
 }
@@ -1872,5 +2130,110 @@ export function drawScreenFlash(ctx: CanvasRenderingContext2D, w: number, h: num
   ctx.globalAlpha = alpha;
   ctx.fillStyle = color;
   ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
+// ── Skill Tree screen ────────────────────────────────────────
+
+export function drawSkillTree(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  skillIds: SkillId[],
+  hoveredIdx: number,
+  time: number,
+) {
+  // Semi-transparent overlay
+  ctx.save();
+  const ov = ctx.createLinearGradient(0, 0, 0, h);
+  ov.addColorStop(0, 'rgba(10,0,30,0.88)');
+  ov.addColorStop(1, 'rgba(5,0,15,0.92)');
+  ctx.fillStyle = ov;
+  ctx.fillRect(0, 0, w, h);
+
+  // Title
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#aa88ff';
+  ctx.shadowBlur = 28;
+  ctx.font = 'bold 52px "Segoe UI Black", "Segoe UI", sans-serif';
+  ctx.fillStyle = '#ddc8ff';
+  ctx.strokeStyle = '#4400aa';
+  ctx.lineWidth = 5;
+  ctx.strokeText('✨ Choose an Upgrade! ✨', w / 2, 88);
+  ctx.fillText('✨ Choose an Upgrade! ✨', w / 2, 88);
+  ctx.shadowBlur = 0;
+
+  const cardW = 260, cardH = 320, gap = 40;
+  const totalW = cardW * skillIds.length + gap * (skillIds.length - 1);
+  const startX = (w - totalW) / 2;
+  const cardY = h / 2 - cardH / 2;
+
+  for (let i = 0; i < skillIds.length; i++) {
+    const id = skillIds[i];
+    const def = SKILL_DEFS[id];
+    const cx = startX + i * (cardW + gap);
+    const isHovered = i === hoveredIdx;
+    const pulse = 0.85 + 0.15 * Math.sin(time * 0.004 + i * 1.8);
+
+    ctx.save();
+
+    if (isHovered) {
+      ctx.shadowColor = '#aa88ff';
+      ctx.shadowBlur = 30 * pulse;
+    }
+
+    // Card background
+    const cardGrad = ctx.createLinearGradient(cx, cardY, cx, cardY + cardH);
+    if (isHovered) {
+      cardGrad.addColorStop(0, 'rgba(90,50,160,0.95)');
+      cardGrad.addColorStop(1, 'rgba(40,20,90,0.95)');
+    } else {
+      cardGrad.addColorStop(0, 'rgba(40,20,80,0.85)');
+      cardGrad.addColorStop(1, 'rgba(15,8,40,0.85)');
+    }
+    ctx.fillStyle = cardGrad;
+    roundRect(ctx, cx, cardY, cardW, cardH, 20);
+    ctx.fill();
+
+    // Card border
+    ctx.strokeStyle = isHovered ? '#cc88ff' : '#553388';
+    ctx.lineWidth = isHovered ? 3 : 1.5;
+    roundRect(ctx, cx, cardY, cardW, cardH, 20);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Emoji (big)
+    ctx.font = '72px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    const emojiY = cardY + 100 + (isHovered ? Math.sin(time * 0.006) * 5 : 0);
+    ctx.fillText(def.emoji, cx + cardW / 2, emojiY);
+
+    // Skill name
+    ctx.font = `bold 22px "Segoe UI", sans-serif`;
+    ctx.fillStyle = isHovered ? '#f0e0ff' : '#c8b8e8';
+    ctx.fillText(def.label, cx + cardW / 2, cardY + 148);
+
+    // Description
+    ctx.font = '15px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#9080b8';
+    ctx.fillText(def.description, cx + cardW / 2, cardY + 178);
+
+    // Hover prompt
+    if (isHovered) {
+      ctx.font = 'bold 16px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#aaffcc';
+      ctx.fillText('Click to choose!', cx + cardW / 2, cardY + cardH - 20);
+    }
+
+    ctx.restore();
+  }
+
+  // Bottom hint
+  ctx.save();
+  ctx.globalAlpha = 0.6;
+  ctx.textAlign = 'center';
+  ctx.font = '16px "Segoe UI", sans-serif';
+  ctx.fillStyle = '#c0b0d8';
+  ctx.fillText('Click a card to claim your upgrade', w / 2, h - 22);
   ctx.restore();
 }

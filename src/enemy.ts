@@ -219,8 +219,8 @@ export class Enemy {
     this.y = Math.max(420, Math.min(GROUND_Y + 10, this.y));
   }
 
-  /** Deal damage to this enemy. Returns actual damage done and whether it died. */
-  takeDamage(amount: number, knockbackX: number, knockbackY: number, particles: ParticleSystem): { died: boolean; damage: number } {
+  /** Deal damage to this enemy. Returns actual damage done and whether it died, plus optional HP drop. */
+  takeDamage(amount: number, knockbackX: number, knockbackY: number, particles: ParticleSystem): { died: boolean; damage: number; hpDropPos?: { x: number; y: number } } {
     if (this.state === 'dying' || this.state === 'dead') return { died: false, damage: 0 };
 
     this.hp -= amount;
@@ -238,7 +238,13 @@ export class Enemy {
       this.hp = 0;
       this.state = 'dying';
       particles.spawnDeathGore(this.x, this.y, this.type);
-      return { died: true, damage: amount };
+      // ~30% chance to drop HP (boss always drops)
+      const drops = this.type === 'boss' || Math.random() < 0.3;
+      return {
+        died: true,
+        damage: amount,
+        hpDropPos: drops ? { x: this.x, y: this.y } : undefined,
+      };
     }
     return { died: false, damage: amount };
   }

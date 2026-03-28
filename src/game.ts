@@ -1,8 +1,8 @@
 // ============================================================
 // Main Game class
 // ============================================================
-import type { GameState, Flower, Cloud, CharacterType, WeaponType } from './types.ts';
-import { CHARACTER_CONFIGS, WEAPON_CONFIGS } from './types.ts';
+import type { GameState, Flower, Cloud, CharacterType, WeaponType, SkillId, HpDrop } from './types.ts';
+import { CHARACTER_CONFIGS, WEAPON_CONFIGS, SKILL_DEFS } from './types.ts';
 import { InputHandler } from './input.ts';
 import { Player } from './player.ts';
 import { Enemy, spawnEnemiesForWave } from './enemy.ts';
@@ -13,22 +13,32 @@ import {
   drawBloodPools, drawSlashTrails, drawSparkles,
   drawProjectiles, drawFloatingTexts, drawHUD,
   drawMenu, drawCharSelect, drawWaveComplete, drawGameOver, drawVictory,
-  drawScreenFlash,
+  drawScreenFlash, drawHpDrops, drawSkillTree,
 } from './drawing.ts';
 
 const CANVAS_W = 1280;
 const CANVAS_H = 720;
 const TOTAL_WAVES = 10;
 const WAVE_COMPLETE_DURATION = 3.5; // seconds before next wave auto-starts
+const HP_DROP_AMOUNT = 20;
+const HP_DROP_PICKUP_RADIUS = 36;
 
 const CHAR_TYPES: CharacterType[] = ['duck', 'penguin', 'parrot'];
-const WEAPON_TYPES: WeaponType[] = ['sword', 'axe', 'spear', 'dagger', 'mace'];
+const WEAPON_TYPES: WeaponType[] = [
+  'sword', 'axe', 'spear', 'dagger', 'mace',
+  'pistol', 'shotgun', 'rifle', 'sniper', 'uzi', 'minigun', 'cannon', 'burst_rifle',
+];
 
 // Character card layout for selection screen
 const CHAR_CARD_W = 280;
 const CHAR_CARD_H = 360;
 const CHAR_CARD_Y = 140;
 const CHAR_CARD_STARTS = [180, 500, 820]; // x positions for each card
+
+const ALL_SKILL_IDS: SkillId[] = [
+  'sharp_claws', 'duck_boost', 'iron_feathers', 'swift_wings',
+  'long_reach', 'lifesteal', 'armor', 'battle_frenzy', 'double_shot',
+];
 
 export class Game {
   private _canvas: HTMLCanvasElement;
@@ -52,6 +62,9 @@ export class Game {
   private _bossHpFlash = 0;
   private _selectedChar: CharacterType = 'duck';
   private _hoveredCharIdx = -1;
+  private _hpDrops: HpDrop[] = [];
+  private _skillChoices: SkillId[] = [];
+  private _hoveredSkillIdx = -1;
 
   constructor(canvas: HTMLCanvasElement) {
     this._canvas = canvas;
@@ -89,6 +102,7 @@ export class Game {
       case 'char_select':   this._updateCharSelect(); break;
       case 'playing':       this._updatePlaying(dt); break;
       case 'wave_complete': this._updateWaveComplete(dt); break;
+      case 'skill_tree':    this._updateSkillTree(); break;
       case 'game_over':     this._updateGameOver(); break;
       case 'victory':       this._updateVictory(); break;
     }
@@ -102,6 +116,11 @@ export class Game {
     // Decay timers
     if (this._screenShake > 0) this._screenShake -= dt * 3;
     if (this._flashAlpha > 0) this._flashAlpha -= dt * 4;
+
+    // Pulse HP drops
+    for (const drop of this._hpDrops) {
+      drop.pulseTimer += dt;
+    }
   }
 
   private _updateMenu() {
@@ -154,8 +173,47 @@ export class Game {
   private _updateWaveComplete(dt: number) {
     this._particles.update(dt);
     this._waveTimer += dt;
+    // Update dance frame
+    if (this._player.isDancing) {
+      // danceFrame is updated inside player.update, but player is frozen during dance
+      this._player.danceFrame += dt * 60;
+    }
     if (this._waveTimer >= WAVE_COMPLETE_DURATION || this._input.mouseClicked || this._input.keys.has('Enter')) {
+      this._player.isDancing = false;
       this._startWave(this._wave + 1);
+    }
+  }
+
+  private _updateSkillTree() {
+    const mx = this._input.mouseX;
+    const my = this._input.mouseY;
+    this._hoveredSkillIdx = -1;
+
+    // 3 skill cards, centered
+    const cardW = 260, cardH = 320, gap = 40;
+    const totalW = cardW * 3 + gap * 2;
+    const startX = (CANVAS_W - totalW) / 2;
+    const cardY = CANVAS_H / 2 - cardH / 2;
+
+    for (let i = 0; i < this._skillChoices.length; i++) {
+      const cx = startX + i * (cardW + gap);
+      if (mx >= cx && mx <= cx + cardW && my >= cardY && my <= cardY + cardH) {
+        this._hoveredSkillIdx = i;
+        break;
+      }
+    }
+
+    if (this._input.mouseClicked && this._hoveredSkillIdx >= 0) {
+      const chosen = this._skillChoices[this._hoveredSkillIdx];
+      this._player.applySkill(chosen);
+      const def = SKILL_DEFS[chosen];
+      this._particles.spawnFloatingText(CANVAS_W / 2, CANVAS_H * 0.3,
+        `${def.emoji} ${def.label}!`, '#aaffcc', 28);
+      // Transition to wave_complete / next wave
+      this._state = 'wave_complete';
+      this._waveTimer = 0;
+      this._player.isDancing = true;
+      this._player.danceFrame = 0;
     }
   }
 
@@ -186,7 +244,7 @@ export class Game {
     // Remove fully-dead enemies
     this._enemies = this._enemies.filter(e => !e.isDead || e.dyingAlpha > 0);
 
-    // Collision: player attack vs enemies
+    // Collision: player attack vs enemies (melee)
     if (this._player.isAttacking) {
       for (const enemy of livingEnemies) {
         if (this._player.attackHits(enemy.x, enemy.y)) {
@@ -196,6 +254,11 @@ export class Game {
           const result = enemy.takeDamage(dmg, kbX, kbY, this._particles);
           if (result.damage > 0) {
             this._particles.spawnFloatingText(enemy.x, enemy.y - 45, `${dmg}`, '#ffe066', 20);
+            // Lifesteal
+            if (this._player.lifestealPct > 0) {
+              const heal = Math.max(1, Math.round(dmg * this._player.lifestealPct));
+              this._player.heal(heal);
+            }
             this._player.registerHit(this._particles, enemy.x, enemy.y);
             if (result.died) {
               const comboBonus = Math.floor(this._player.combo * 0.5);
@@ -206,8 +269,48 @@ export class Game {
               this._flashAlpha = 0.15;
               this._flashColor = '#ff2200';
               this._bossHpFlash = enemy.type === 'boss' ? 0.5 : 0;
+              if (result.hpDropPos) {
+                this._hpDrops.push({ x: result.hpDropPos.x, y: result.hpDropPos.y, hp: HP_DROP_AMOUNT, alpha: 1, pulseTimer: 0 });
+              }
             }
           }
+        }
+      }
+    }
+
+    // Collision: player projectiles vs enemies
+    for (let i = this._particles.projectiles.length - 1; i >= 0; i--) {
+      const proj = this._particles.projectiles[i];
+      if (proj.fromEnemy) continue;
+      for (const enemy of livingEnemies) {
+        const dx = proj.x - enemy.x;
+        const dy = proj.y - enemy.y;
+        if (dx * dx + dy * dy < (enemy.size + 8) * (enemy.size + 8)) {
+          const result = enemy.takeDamage(proj.damage, dx, dy, this._particles);
+          if (result.damage > 0) {
+            this._particles.spawnFloatingText(enemy.x, enemy.y - 45, `${proj.damage}`, '#ffe066', 20);
+            // Lifesteal
+            if (this._player.lifestealPct > 0) {
+              const heal = Math.max(1, Math.round(proj.damage * this._player.lifestealPct));
+              this._player.heal(heal);
+            }
+            this._player.registerHit(this._particles, enemy.x, enemy.y);
+            if (result.died) {
+              const comboBonus = Math.floor(this._player.combo * 0.5);
+              const pts = enemy.scoreValue + comboBonus * 10;
+              this._score += pts;
+              this._particles.spawnFloatingText(enemy.x, enemy.y - 60, `+${pts}`, '#aaffcc', 18);
+              this._screenShake = Math.min(this._screenShake + 0.4, 1);
+              this._flashAlpha = 0.15;
+              this._flashColor = '#ff2200';
+              this._bossHpFlash = enemy.type === 'boss' ? 0.5 : 0;
+              if (result.hpDropPos) {
+                this._hpDrops.push({ x: result.hpDropPos.x, y: result.hpDropPos.y, hp: HP_DROP_AMOUNT, alpha: 1, pulseTimer: 0 });
+              }
+            }
+          }
+          this._particles.projectiles.splice(i, 1);
+          break;
         }
       }
     }
@@ -229,6 +332,21 @@ export class Game {
       }
     }
 
+    // Collision: player vs HP drops
+    for (let i = this._hpDrops.length - 1; i >= 0; i--) {
+      const drop = this._hpDrops[i];
+      const dx = drop.x - this._player.x;
+      const dy = drop.y - this._player.y;
+      if (dx * dx + dy * dy < HP_DROP_PICKUP_RADIUS * HP_DROP_PICKUP_RADIUS) {
+        if (this._player.hp < this._player.maxHp) {
+          this._player.heal(drop.hp);
+          this._particles.spawnFloatingText(drop.x, drop.y - 30, `+${drop.hp} HP`, '#aaffcc', 20);
+          this._particles.spawnComboSparkles(drop.x, drop.y, 4);
+          this._hpDrops.splice(i, 1);
+        }
+      }
+    }
+
     // Check player death
     if (this._player.dead) {
       this._state = 'game_over';
@@ -241,11 +359,12 @@ export class Game {
       if (this._wave >= TOTAL_WAVES) {
         this._state = 'victory';
       } else {
-        this._state = 'wave_complete';
-        this._waveTimer = 0;
         // Small heal between waves
         this._player.heal(20);
         this._particles.spawnFloatingText(this._player.x, this._player.y - 60, '+20 HP!', '#aaffcc', 22);
+        // Show skill tree first
+        this._skillChoices = _pickSkills(3);
+        this._state = 'skill_tree';
       }
     }
   }
@@ -278,6 +397,12 @@ export class Game {
           this._time);
         break;
 
+      case 'skill_tree': {
+        drawBackground(ctx, CANVAS_W, CANVAS_H, this._flowers, this._clouds);
+        drawSkillTree(ctx, CANVAS_W, CANVAS_H, this._skillChoices, this._hoveredSkillIdx, this._time);
+        break;
+      }
+
       case 'playing':
       case 'wave_complete':
       case 'game_over':
@@ -296,6 +421,8 @@ export class Game {
         drawFeatherParticles(ctx, this._particles.feathers);
         // Projectiles
         drawProjectiles(ctx, this._particles.projectiles);
+        // HP drops
+        drawHpDrops(ctx, this._hpDrops);
 
         // Entities – sorted by Y for depth
         const drawables: Array<{ y: number; fn: () => void }> = [];
@@ -319,6 +446,8 @@ export class Game {
             this._player.isInvincible,
             this._player.charType,
             this._player.weaponType,
+            this._player.isDancing,
+            this._player.danceFrame,
           ),
         });
 
@@ -378,6 +507,7 @@ export class Game {
     this._player.setCharacter(this._selectedChar);
     this._player.reset(CANVAS_W / 2, CANVAS_H * 0.72);
     this._particles.clear();
+    this._hpDrops = [];
     this._generateScenery();
     this._startWave(1);
   }
@@ -389,6 +519,7 @@ export class Game {
     const weapon = WEAPON_TYPES[Math.floor(Math.random() * WEAPON_TYPES.length)];
     this._player.setWeapon(weapon);
     this._state = 'playing';
+    this._hpDrops = [];
     // Flash and shake to signal new wave
     this._flashAlpha = 0.4;
     this._flashColor = '#ffffff';
@@ -424,4 +555,15 @@ export class Game {
       });
     }
   }
+}
+
+/** Pick N unique random skill IDs */
+function _pickSkills(n: number): SkillId[] {
+  const pool = [...ALL_SKILL_IDS];
+  const chosen: SkillId[] = [];
+  while (chosen.length < n && pool.length > 0) {
+    const idx = Math.floor(Math.random() * pool.length);
+    chosen.push(pool.splice(idx, 1)[0]);
+  }
+  return chosen;
 }
