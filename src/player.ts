@@ -145,13 +145,15 @@ export class Player {
         const spread = wCfg.projectileSpread ?? 0;
         const speed = wCfg.projectileSpeed ?? 14;
         const dmg = this.attackDamage;
+        const isBazooka = this.weaponType === 'bazooka';
+        const splashRadius = isBazooka ? 80 : undefined;
         for (let i = 0; i < count; i++) {
           const offset = count > 1 ? (i / (count - 1) - 0.5) * spread * 2 : 0;
           particles.spawnProjectile(
             this.x, this.y - 20,
             input.mouseX + Math.cos(this.attackAngle + Math.PI / 2) * offset * PROJECTILE_SPREAD_DISTANCE,
             input.mouseY + Math.sin(this.attackAngle + Math.PI / 2) * offset * PROJECTILE_SPREAD_DISTANCE,
-            speed, dmg, false,
+            speed, dmg, false, splashRadius, isBazooka,
           );
         }
       } else {

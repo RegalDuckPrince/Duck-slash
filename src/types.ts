@@ -2,13 +2,13 @@
 // Type definitions for Duck Slash: Quack of Doom
 // ============================================================
 
-export type EnemyType = 'goose' | 'crow' | 'zombie_chicken' | 'boss';
-export type GameState = 'menu' | 'char_select' | 'playing' | 'wave_complete' | 'skill_tree' | 'game_over' | 'victory';
+export type EnemyType = 'goose' | 'crow' | 'zombie_chicken' | 'boss' | 'archer_boss' | 'berserker_boss';
+export type GameState = 'menu' | 'char_select' | 'playing' | 'wave_complete' | 'skill_tree' | 'shop' | 'game_over' | 'victory';
 export type EnemyState = 'idle' | 'chase' | 'attack' | 'stagger' | 'dying' | 'dead';
 export type CharacterType = 'duck' | 'penguin' | 'parrot';
 export type WeaponType =
   | 'sword' | 'axe' | 'spear' | 'dagger' | 'mace'
-  | 'pistol' | 'shotgun' | 'rifle' | 'sniper' | 'uzi' | 'minigun' | 'cannon' | 'burst_rifle';
+  | 'pistol' | 'shotgun' | 'rifle' | 'sniper' | 'uzi' | 'minigun' | 'cannon' | 'burst_rifle' | 'bazooka';
 
 export type SkillId =
   | 'sharp_claws' | 'duck_boost' | 'iron_feathers'
@@ -119,6 +119,34 @@ export interface Projectile {
   alpha: number;
   damage: number;
   fromEnemy: boolean;
+  splashRadius?: number;   // bazooka explosion radius
+  isRocket?: boolean;      // visual: render as rocket
+  isSaul?: boolean;        // visual: Saul's briefcase projectile
+  isArcherBoss?: boolean;  // visual: feather arrow from archer boss
+}
+
+// ── Saul Goodman Ally ──────────────────────────────────────────
+
+export interface SaulAlly {
+  x: number;
+  y: number;
+  hp: number;
+  maxHp: number;
+  facing: number;
+  walkFrame: number;
+  attackTimer: number;
+  alpha: number;
+}
+
+// ── Shop ──────────────────────────────────────────────────────
+
+export interface ShopItem {
+  id: string;
+  label: string;
+  description: string;
+  emoji: string;
+  cost: number;
+  isGamble: boolean;
 }
 
 // ── HP Drop ──────────────────────────────────────────────────
@@ -220,6 +248,7 @@ export const WEAPON_CONFIGS: Record<WeaponType, WeaponConfig> = {
   minigun:     { type: 'minigun',     label: 'Minigun',      emoji: '🌀',  damageMult: 0.28, cooldownMult: 0.15, rangeMult: 1.0, isGun: true,  projectileSpeed: 13, projectileCount: 1, projectileSpread: 0.12 },
   cannon:      { type: 'cannon',      label: 'Cannon',       emoji: '💣',  damageMult: 4.5,  cooldownMult: 3.5,  rangeMult: 1.0, isGun: true,  projectileSpeed: 8,  projectileCount: 1, projectileSpread: 0 },
   burst_rifle: { type: 'burst_rifle', label: 'Burst Rifle',  emoji: '🔥',  damageMult: 0.8,  cooldownMult: 0.9,  rangeMult: 1.0, isGun: true,  projectileSpeed: 16, projectileCount: 3, projectileSpread: 0.06 },
+  bazooka:     { type: 'bazooka',     label: 'BAZOOKA',      emoji: '🚀',  damageMult: 10.0, cooldownMult: 6.0,  rangeMult: 1.0, isGun: true,  projectileSpeed: 7,  projectileCount: 1, projectileSpread: 0 },
 };
 
 export const SKILL_DEFS: Record<SkillId, SkillDef> = {
