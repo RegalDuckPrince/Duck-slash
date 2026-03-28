@@ -1,7 +1,8 @@
 // ============================================================
 // Main Game class
 // ============================================================
-import type { GameState, Flower, Cloud } from './types.ts';
+import type { GameState, Flower, Cloud, CharacterType, WeaponType } from './types.ts';
+import { CHARACTER_CONFIGS, WEAPON_CONFIGS } from './types.ts';
 import { InputHandler } from './input.ts';
 import { Player } from './player.ts';
 import { Enemy, spawnEnemiesForWave } from './enemy.ts';
@@ -11,7 +12,7 @@ import {
   drawBloodParticles, drawFeatherParticles, drawBodyParts,
   drawBloodPools, drawSlashTrails, drawSparkles,
   drawProjectiles, drawFloatingTexts, drawHUD,
-  drawMenu, drawWaveComplete, drawGameOver, drawVictory,
+  drawMenu, drawCharSelect, drawWaveComplete, drawGameOver, drawVictory,
   drawScreenFlash,
 } from './drawing.ts';
 
@@ -19,6 +20,15 @@ const CANVAS_W = 1280;
 const CANVAS_H = 720;
 const TOTAL_WAVES = 10;
 const WAVE_COMPLETE_DURATION = 3.5; // seconds before next wave auto-starts
+
+const CHAR_TYPES: CharacterType[] = ['duck', 'penguin', 'parrot'];
+const WEAPON_TYPES: WeaponType[] = ['sword', 'axe', 'spear', 'dagger', 'mace'];
+
+// Character card layout for selection screen
+const CHAR_CARD_W = 280;
+const CHAR_CARD_H = 360;
+const CHAR_CARD_Y = 140;
+const CHAR_CARD_STARTS = [180, 500, 820]; // x positions for each card
 
 export class Game {
   private _canvas: HTMLCanvasElement;
@@ -40,6 +50,8 @@ export class Game {
   private _time = 0;       // ms since page load
   private _rafId = 0;
   private _bossHpFlash = 0;
+  private _selectedChar: CharacterType = 'duck';
+  private _hoveredCharIdx = -1;
 
   constructor(canvas: HTMLCanvasElement) {
     this._canvas = canvas;
@@ -74,6 +86,7 @@ export class Game {
   private _update(dt: number) {
     switch (this._state) {
       case 'menu':          this._updateMenu(); break;
+      case 'char_select':   this._updateCharSelect(); break;
       case 'playing':       this._updatePlaying(dt); break;
       case 'wave_complete': this._updateWaveComplete(dt); break;
       case 'game_over':     this._updateGameOver(); break;
@@ -93,6 +106,47 @@ export class Game {
 
   private _updateMenu() {
     if (this._input.mouseClicked || this._input.keys.has('Enter')) {
+      this._state = 'char_select';
+      this._hoveredCharIdx = -1;
+    }
+  }
+
+  private _updateCharSelect() {
+    // Detect which card the mouse is over
+    const mx = this._input.mouseX;
+    const my = this._input.mouseY;
+    this._hoveredCharIdx = -1;
+    for (let i = 0; i < CHAR_CARD_STARTS.length; i++) {
+      const cx = CHAR_CARD_STARTS[i];
+      if (mx >= cx && mx <= cx + CHAR_CARD_W && my >= CHAR_CARD_Y && my <= CHAR_CARD_Y + CHAR_CARD_H) {
+        this._hoveredCharIdx = i;
+        break;
+      }
+    }
+
+    // Arrow key navigation
+    if (this._input.keys.has('ArrowLeft') || this._input.keys.has('KeyA')) {
+      const idx = CHAR_TYPES.indexOf(this._selectedChar);
+      this._selectedChar = CHAR_TYPES[(idx + CHAR_TYPES.length - 1) % CHAR_TYPES.length];
+      this._input.keys.delete('ArrowLeft');
+      this._input.keys.delete('KeyA');
+    }
+    if (this._input.keys.has('ArrowRight') || this._input.keys.has('KeyD')) {
+      const idx = CHAR_TYPES.indexOf(this._selectedChar);
+      this._selectedChar = CHAR_TYPES[(idx + 1) % CHAR_TYPES.length];
+      this._input.keys.delete('ArrowRight');
+      this._input.keys.delete('KeyD');
+    }
+
+    // Click to select
+    if (this._input.mouseClicked && this._hoveredCharIdx >= 0) {
+      this._selectedChar = CHAR_TYPES[this._hoveredCharIdx];
+      this._startGame();
+      return;
+    }
+
+    // Enter to confirm
+    if (this._input.keys.has('Enter')) {
       this._startGame();
     }
   }
@@ -107,13 +161,15 @@ export class Game {
 
   private _updateGameOver() {
     if (this._input.mouseClicked || this._input.keys.has('Enter')) {
-      this._startGame();
+      this._state = 'char_select';
+      this._hoveredCharIdx = -1;
     }
   }
 
   private _updateVictory() {
     if (this._input.mouseClicked || this._input.keys.has('Enter')) {
-      this._startGame();
+      this._state = 'char_select';
+      this._hoveredCharIdx = -1;
     }
   }
 
@@ -180,10 +236,8 @@ export class Game {
       return;
     }
 
-    // Check wave clear
-    const allDead = this._enemies.every(e => e.isDead);
-    const stillDying = this._enemies.some(e => e.state === 'dying');
-    if (allDead && !stillDying && this._enemies.length > 0) {
+    // Check wave clear – enemies are removed from the array once fully dead
+    if (this._enemies.length === 0) {
       if (this._wave >= TOTAL_WAVES) {
         this._state = 'victory';
       } else {
@@ -214,6 +268,14 @@ export class Game {
     switch (this._state) {
       case 'menu':
         drawMenu(ctx, CANVAS_W, CANVAS_H, this._time);
+        break;
+
+      case 'char_select':
+        drawCharSelect(ctx, CANVAS_W, CANVAS_H,
+          CHAR_TYPES.indexOf(this._selectedChar),
+          this._hoveredCharIdx,
+          CHAR_CARD_STARTS, CHAR_CARD_W, CHAR_CARD_H, CHAR_CARD_Y,
+          this._time);
         break;
 
       case 'playing':
@@ -255,6 +317,8 @@ export class Game {
             this._player.hitFlash,
             this._player.combo,
             this._player.isInvincible,
+            this._player.charType,
+            this._player.weaponType,
           ),
         });
 
@@ -284,7 +348,8 @@ export class Game {
         // HUD
         if (this._state === 'playing') {
           drawHUD(ctx, CANVAS_W, this._player.hp, this._player.maxHp,
-            this._score, this._wave, TOTAL_WAVES, this._player.comboTimer);
+            this._score, this._wave, TOTAL_WAVES, this._player.comboTimer,
+            this._player.weaponType);
         }
 
         // Flash overlay
@@ -310,6 +375,7 @@ export class Game {
   private _startGame() {
     this._score = 0;
     this._wave = 1;
+    this._player.setCharacter(this._selectedChar);
     this._player.reset(CANVAS_W / 2, CANVAS_H * 0.72);
     this._particles.clear();
     this._generateScenery();
@@ -319,6 +385,9 @@ export class Game {
   private _startWave(wave: number) {
     this._wave = wave;
     this._enemies = spawnEnemiesForWave(wave);
+    // Assign a random weapon for this wave
+    const weapon = WEAPON_TYPES[Math.floor(Math.random() * WEAPON_TYPES.length)];
+    this._player.setWeapon(weapon);
     this._state = 'playing';
     // Flash and shake to signal new wave
     this._flashAlpha = 0.4;
@@ -327,6 +396,10 @@ export class Game {
     this._particles.spawnFloatingText(CANVAS_W / 2, CANVAS_H * 0.4,
       wave === TOTAL_WAVES ? '💀 BOSS WAVE! 💀' : `⚔️  Wave ${wave}!`,
       wave === TOTAL_WAVES ? '#ff3344' : '#ffe066', 34);
+    // Floating weapon text
+    const wCfg = WEAPON_CONFIGS[weapon];
+    this._particles.spawnFloatingText(CANVAS_W / 2, CANVAS_H * 0.5,
+      `${wCfg.emoji} ${wCfg.label}!`, '#aaddff', 26);
   }
 
   private _generateScenery() {

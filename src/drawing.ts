@@ -2,7 +2,9 @@
 // Drawing helpers – all procedural canvas art
 // ============================================================
 import type { EnemyType, BloodPool, BloodParticle, FeatherParticle, BodyPart,
-  SlashTrail, FloatingText, Sparkle, Projectile, Flower, Cloud } from './types.ts';
+  SlashTrail, FloatingText, Sparkle, Projectile, Flower, Cloud,
+  CharacterType, WeaponType } from './types.ts';
+import { CHARACTER_CONFIGS, WEAPON_CONFIGS } from './types.ts';
 
 // ── Utility ──────────────────────────────────────────────────
 
@@ -118,6 +120,8 @@ export function drawPlayer(
   rollAlpha: number,
   combo: number,
   invincible: boolean,
+  charType: CharacterType = 'duck',
+  weaponType: WeaponType = 'sword',
 ) {
   ctx.save();
   ctx.translate(x, y);
@@ -131,6 +135,26 @@ export function drawPlayer(
 
   const bob = Math.sin(walkFrame * 0.18) * 2.5;
 
+  // Character colour palette
+  let bodyColor1: string, bodyColor2: string, bodyOutline: string,
+      bellyColor: string, helmetColor: string, helmetOutline: string,
+      crestColor: string, billColor: string, billOutline: string;
+
+  if (charType === 'penguin') {
+    bodyColor1 = '#2a2a3a'; bodyColor2 = '#111122'; bodyOutline = '#4a4a6a';
+    bellyColor = '#e8e8f0'; helmetColor = '#223344'; helmetOutline = '#445566';
+    crestColor = '#4488cc'; billColor = '#ffcc00'; billOutline = '#cc9900';
+  } else if (charType === 'parrot') {
+    bodyColor1 = '#cc2222'; bodyColor2 = '#991100'; bodyOutline = '#ff5500';
+    bellyColor = '#ffdd66'; helmetColor = '#116622'; helmetOutline = '#228833';
+    crestColor = '#ffaa00'; billColor = '#ffcc00'; billOutline = '#cc9900';
+  } else {
+    // duck (default)
+    bodyColor1 = '#ffe033'; bodyColor2 = '#e8b800'; bodyOutline = '#c9a000';
+    bellyColor = '#fff8d0'; helmetColor = '#b0c8e8'; helmetOutline = '#7898b8';
+    crestColor = '#ff6b9d'; billColor = '#ff8c00'; billOutline = '#c96000';
+  }
+
   // Shadow
   ctx.fillStyle = 'rgba(0,0,0,0.18)';
   ctx.beginPath();
@@ -142,36 +166,36 @@ export function drawPlayer(
     ctx.save();
     ctx.translate(16, -8 + bob);
     ctx.rotate(0.35);
-    _drawSword(ctx, 0.75);
+    _drawWeapon(ctx, weaponType, 0.75);
     ctx.restore();
   }
 
   // ── Body ─────────────────────────────────────────────────
   // Tail feathers
-  ctx.fillStyle = '#e8c800';
+  ctx.fillStyle = bodyColor2;
   ctx.beginPath();
   ctx.ellipse(-14, 4 + bob, 9, 14, -0.5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#ffd700';
+  ctx.fillStyle = bodyColor1;
   ctx.beginPath();
   ctx.ellipse(-13, 2 + bob, 7, 11, -0.4, 0, Math.PI * 2);
   ctx.fill();
 
   // Body
   const bodyGrad = ctx.createRadialGradient(2, 0 + bob, 2, 2, 2 + bob, 28);
-  bodyGrad.addColorStop(0, '#ffe033');
-  bodyGrad.addColorStop(1, '#e8b800');
+  bodyGrad.addColorStop(0, bodyColor1);
+  bodyGrad.addColorStop(1, bodyColor2);
   ctx.fillStyle = bodyGrad;
   ctx.beginPath();
   ctx.ellipse(0, 5 + bob, 22, 28, 0, 0, Math.PI * 2);
   ctx.fill();
   // outline
-  ctx.strokeStyle = '#c9a000';
+  ctx.strokeStyle = bodyOutline;
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
   // Belly
-  ctx.fillStyle = '#fff8d0';
+  ctx.fillStyle = bellyColor;
   ctx.beginPath();
   ctx.ellipse(4, 10 + bob, 12, 19, 0.1, 0, Math.PI * 2);
   ctx.fill();
@@ -196,46 +220,46 @@ export function drawPlayer(
 
   // Wing
   const wf = isRolling ? 0.9 : Math.sin(walkFrame * 0.18) * 0.25;
-  ctx.fillStyle = '#f0c800';
+  ctx.fillStyle = bodyColor2;
   ctx.save();
   ctx.translate(-8, 0 + bob);
   ctx.rotate(-wf);
   ctx.beginPath();
   ctx.ellipse(0, 4, 8, 17, -0.35, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#c9a000';
+  ctx.strokeStyle = bodyOutline;
   ctx.lineWidth = 1;
   ctx.stroke();
   ctx.restore();
 
   // Head
   const headGrad = ctx.createRadialGradient(6, -22 + bob, 3, 6, -22 + bob, 16);
-  headGrad.addColorStop(0, '#ffe033');
-  headGrad.addColorStop(1, '#e8b800');
+  headGrad.addColorStop(0, bodyColor1);
+  headGrad.addColorStop(1, bodyColor2);
   ctx.fillStyle = headGrad;
   ctx.beginPath();
   ctx.arc(6, -22 + bob, 17, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#c9a000';
+  ctx.strokeStyle = bodyOutline;
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
   // Tiny helmet/cap
-  ctx.fillStyle = '#b0c8e8';
+  ctx.fillStyle = helmetColor;
   ctx.beginPath();
   ctx.ellipse(6, -32 + bob, 14, 9, 0, Math.PI, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#7898b8';
+  ctx.strokeStyle = helmetOutline;
   ctx.lineWidth = 1;
   ctx.stroke();
   // Helmet crest
-  ctx.fillStyle = '#ff6b9d';
+  ctx.fillStyle = crestColor;
   ctx.beginPath();
   ctx.ellipse(6, -39 + bob, 3, 7, 0, 0, Math.PI * 2);
   ctx.fill();
 
   // Bill
-  ctx.fillStyle = '#ff8c00';
+  ctx.fillStyle = billColor;
   ctx.beginPath();
   ctx.moveTo(20, -21 + bob);
   ctx.lineTo(32, -24 + bob);
@@ -243,7 +267,7 @@ export function drawPlayer(
   ctx.lineTo(20, -18 + bob);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = '#c96000';
+  ctx.strokeStyle = billOutline;
   ctx.lineWidth = 1;
   ctx.stroke();
 
@@ -278,15 +302,15 @@ export function drawPlayer(
   ctx.ellipse(10, -19 + bob, 5.5, 3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // ── Attacking sword swing ─────────────────────────────────
+  // ── Attacking weapon swing ────────────────────────────────
   if (isAttacking) {
     ctx.save();
-    // sword pivots at player's arm
+    // weapon pivots at player's arm
     ctx.translate(12, -8 + bob);
     // attackAngle is in world space; facing already flipped ctx via scale
     const localAngle = -Math.PI * 0.8 + attackProgress * Math.PI * 1.5;
     ctx.rotate(localAngle);
-    _drawSword(ctx, 1);
+    _drawWeapon(ctx, weaponType, 1);
     ctx.restore();
 
     // Slash arc glow
@@ -379,6 +403,153 @@ function _drawSword(ctx: CanvasRenderingContext2D, scale: number) {
   ctx.strokeStyle = '#806020';
   ctx.lineWidth = 1;
   ctx.stroke();
+  ctx.restore();
+}
+
+// Dispatch to correct weapon drawing
+function _drawWeapon(ctx: CanvasRenderingContext2D, weapon: WeaponType, scale: number) {
+  switch (weapon) {
+    case 'axe':    _drawAxe(ctx, scale);    break;
+    case 'spear':  _drawSpear(ctx, scale);  break;
+    case 'dagger': _drawDagger(ctx, scale); break;
+    case 'mace':   _drawMace(ctx, scale);   break;
+    default:       _drawSword(ctx, scale);  break;
+  }
+}
+
+function _drawAxe(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.shadowColor = '#cc6633';
+  ctx.shadowBlur = 8;
+  // Handle
+  ctx.fillStyle = '#7a4420';
+  roundRect(ctx, -3, -50, 6, 64, 2);
+  ctx.fill();
+  ctx.strokeStyle = '#4a2810'; ctx.lineWidth = 1; ctx.stroke();
+  // Axe head
+  ctx.fillStyle = '#aaaaaa';
+  ctx.beginPath();
+  ctx.moveTo(-2, -50);
+  ctx.lineTo(-22, -62);
+  ctx.lineTo(-18, -42);
+  ctx.lineTo(-2, -36);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#666'; ctx.lineWidth = 1.2; ctx.stroke();
+  // Shine
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.moveTo(-5, -52);
+  ctx.lineTo(-18, -60);
+  ctx.lineTo(-14, -52);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function _drawSpear(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.shadowColor = '#66cc88';
+  ctx.shadowBlur = 8;
+  // Shaft (long)
+  ctx.fillStyle = '#9a6430';
+  ctx.beginPath();
+  ctx.rect(-2, -78, 4, 92);
+  ctx.fill();
+  ctx.strokeStyle = '#6a4020'; ctx.lineWidth = 1; ctx.stroke();
+  // Tip
+  ctx.fillStyle = '#d8d8d8';
+  ctx.beginPath();
+  ctx.moveTo(0, -92);
+  ctx.lineTo(-5, -78);
+  ctx.lineTo(5, -78);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#888'; ctx.lineWidth = 1; ctx.stroke();
+  // Shine
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.beginPath();
+  ctx.moveTo(-1, -92);
+  ctx.lineTo(-4, -80);
+  ctx.lineTo(0, -82);
+  ctx.closePath();
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function _drawDagger(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.shadowColor = '#aabbcc';
+  ctx.shadowBlur = 6;
+  // Blade (short)
+  const bladeGrad = ctx.createLinearGradient(-2, -38, 2, -38);
+  bladeGrad.addColorStop(0, '#e8f0ff');
+  bladeGrad.addColorStop(1, '#90aacc');
+  ctx.fillStyle = bladeGrad;
+  ctx.beginPath();
+  ctx.moveTo(-2, 0);
+  ctx.lineTo(-1, -32);
+  ctx.lineTo(0, -38);
+  ctx.lineTo(1, -32);
+  ctx.lineTo(2, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#6080a0'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.shadowBlur = 0;
+  // Guard
+  ctx.fillStyle = '#c8a040';
+  roundRect(ctx, -8, -6, 16, 5, 2);
+  ctx.fill();
+  ctx.strokeStyle = '#806020'; ctx.lineWidth = 1; ctx.stroke();
+  // Handle
+  ctx.fillStyle = '#5a3010';
+  roundRect(ctx, -2.5, -2, 5, 12, 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function _drawMace(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.shadowColor = '#ddaa33';
+  ctx.shadowBlur = 10;
+  // Handle
+  ctx.fillStyle = '#7a4420';
+  roundRect(ctx, -3.5, -2, 7, 48, 2);
+  ctx.fill();
+  ctx.strokeStyle = '#4a2810'; ctx.lineWidth = 1; ctx.stroke();
+  // Mace head
+  ctx.fillStyle = '#aaaaaa';
+  ctx.beginPath();
+  ctx.arc(0, -52, 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#777'; ctx.lineWidth = 1.5; ctx.stroke();
+  // Spikes
+  ctx.fillStyle = '#888';
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    ctx.save();
+    ctx.translate(Math.cos(a) * 14, -52 + Math.sin(a) * 14);
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-3, -6);
+    ctx.lineTo(3, -6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  // Shine
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath();
+  ctx.arc(-5, -58, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
   ctx.restore();
 }
 
@@ -1197,6 +1368,7 @@ export function drawHUD(
   wave: number,
   totalWaves: number,
   comboTimer: number,
+  weaponType: WeaponType = 'sword',
 ) {
   ctx.save();
 
@@ -1206,6 +1378,12 @@ export function drawHUD(
   ctx.textAlign = 'left';
   ctx.fillText('❤️ HP', 18, 30);
   _drawBar(ctx, 18, 36, 200, 16, playerHp / playerMaxHp, '#ff4466', '#ff99bb', '#2a0010');
+
+  // Weapon indicator
+  const wCfg = WEAPON_CONFIGS[weaponType];
+  ctx.font = 'bold 14px "Segoe UI", sans-serif';
+  ctx.fillStyle = '#aaddff';
+  ctx.fillText(`${wCfg.emoji} ${wCfg.label}`, 18, 68);
 
   // Score
   ctx.textAlign = 'right';
@@ -1412,6 +1590,199 @@ export function drawWaveComplete(ctx: CanvasRenderingContext2D, w: number, h: nu
   ctx.strokeText('Get ready for the next wave...', w / 2, h * 0.65);
   ctx.fillText('Get ready for the next wave...', w / 2, h * 0.65);
 
+  ctx.restore();
+}
+
+// Draws a mini-character silhouette for character select cards
+function _drawCharPreview(ctx: CanvasRenderingContext2D, charType: CharacterType) {
+  ctx.save();
+  ctx.scale(0.8, 0.8);
+  let bodyC1: string, bodyC2: string, bellyC: string, billC: string;
+  if (charType === 'penguin') {
+    bodyC1 = '#2a2a3a'; bodyC2 = '#111122'; bellyC = '#e8e8f0'; billC = '#ffcc00';
+  } else if (charType === 'parrot') {
+    bodyC1 = '#cc2222'; bodyC2 = '#991100'; bellyC = '#ffdd66'; billC = '#ffcc00';
+  } else {
+    bodyC1 = '#ffe033'; bodyC2 = '#e8b800'; bellyC = '#fff8d0'; billC = '#ff8c00';
+  }
+  // Body
+  const bg = ctx.createRadialGradient(2, 5, 2, 2, 7, 30);
+  bg.addColorStop(0, bodyC1); bg.addColorStop(1, bodyC2);
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.ellipse(0, 10, 24, 30, 0, 0, Math.PI * 2); ctx.fill();
+  // Belly
+  ctx.fillStyle = bellyC;
+  ctx.beginPath(); ctx.ellipse(4, 14, 13, 20, 0.1, 0, Math.PI * 2); ctx.fill();
+  // Head
+  ctx.fillStyle = bodyC1;
+  ctx.beginPath(); ctx.arc(6, -18, 18, 0, Math.PI * 2); ctx.fill();
+  // Bill
+  ctx.fillStyle = billC;
+  ctx.beginPath();
+  ctx.moveTo(20, -16); ctx.lineTo(34, -19); ctx.lineTo(32, -14); ctx.lineTo(20, -14);
+  ctx.closePath(); ctx.fill();
+  // Eye
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(14, -20, 7, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#1a1a2e';
+  ctx.beginPath(); ctx.arc(15, -20, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'white';
+  ctx.beginPath(); ctx.arc(17, -22, 1.5, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+export function drawCharSelect(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  selectedIdx: number,
+  hoveredIdx: number,
+  cardStarts: number[],
+  cardW: number,
+  cardH: number,
+  cardY: number,
+  time: number,
+) {
+  // Background
+  const bg = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h));
+  bg.addColorStop(0, '#1a0840');
+  bg.addColorStop(1, '#0a0318');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  // Stars
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  for (let i = 0; i < 60; i++) {
+    const sx = (i * 211 + 7) % w;
+    const sy = (i * 331 + 23) % (h * 0.85);
+    const blink = 0.3 + 0.7 * Math.sin(time * 0.001 * (1 + (i % 4) * 0.4) + i);
+    ctx.globalAlpha = blink * 0.7;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 1 + (i % 3) * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Title
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#cc88ff';
+  ctx.shadowBlur = 30;
+  ctx.font = 'bold 52px "Segoe UI Black", "Segoe UI", sans-serif';
+  ctx.fillStyle = '#f0ddff';
+  ctx.strokeStyle = '#6600aa';
+  ctx.lineWidth = 5;
+  ctx.strokeText('Choose Your Fighter!', w / 2, 90);
+  ctx.fillText('Choose Your Fighter!', w / 2, 90);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  const chars: CharacterType[] = ['duck', 'penguin', 'parrot'];
+  for (let i = 0; i < chars.length; i++) {
+    const cx = cardStarts[i];
+    const cfg = CHARACTER_CONFIGS[chars[i]];
+    const isSelected = i === selectedIdx;
+    const isHovered = i === hoveredIdx;
+    const pulse = 0.85 + 0.15 * Math.sin(time * 0.004 + i * 2);
+
+    ctx.save();
+
+    // Card glow / highlight
+    if (isSelected) {
+      ctx.shadowColor = '#cc88ff';
+      ctx.shadowBlur = 28 * pulse;
+    } else if (isHovered) {
+      ctx.shadowColor = '#8866cc';
+      ctx.shadowBlur = 18;
+    }
+
+    // Card background
+    const cardGrad = ctx.createLinearGradient(cx, cardY, cx, cardY + cardH);
+    if (isSelected) {
+      cardGrad.addColorStop(0, 'rgba(100,50,160,0.92)');
+      cardGrad.addColorStop(1, 'rgba(50,20,90,0.92)');
+    } else if (isHovered) {
+      cardGrad.addColorStop(0, 'rgba(70,40,120,0.85)');
+      cardGrad.addColorStop(1, 'rgba(30,15,70,0.85)');
+    } else {
+      cardGrad.addColorStop(0, 'rgba(40,20,80,0.8)');
+      cardGrad.addColorStop(1, 'rgba(15,8,40,0.8)');
+    }
+    ctx.fillStyle = cardGrad;
+    roundRect(ctx, cx, cardY, cardW, cardH, 18);
+    ctx.fill();
+
+    // Card border
+    ctx.strokeStyle = isSelected ? '#cc88ff' : isHovered ? '#8866cc' : '#442266';
+    ctx.lineWidth = isSelected ? 3 : 1.5;
+    roundRect(ctx, cx, cardY, cardW, cardH, 18);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Character preview (mini sprite)
+    ctx.save();
+    ctx.translate(cx + cardW / 2, cardY + 110);
+    _drawCharPreview(ctx, chars[i]);
+    ctx.restore();
+
+    // Emoji + Name
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 32px "Segoe UI", sans-serif';
+    ctx.fillStyle = isSelected ? '#f0ddff' : '#c8b8e8';
+    ctx.fillText(`${cfg.emoji} ${cfg.label}`, cx + cardW / 2, cardY + 200);
+
+    // Description
+    ctx.font = '15px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#a090c0';
+    // Word-wrap simplified: just display as-is (descriptions are short)
+    ctx.fillText(cfg.description, cx + cardW / 2, cardY + 226);
+
+    // Stats
+    const statY = cardY + 255;
+    const statLabels = [
+      { label: '❤️ HP',     val: cfg.hpMult },
+      { label: '👟 Speed',  val: cfg.speedMult },
+      { label: '⚔️ Damage', val: cfg.damageMult },
+    ];
+    for (let s = 0; s < statLabels.length; s++) {
+      const sy = statY + s * 28;
+      ctx.textAlign = 'left';
+      ctx.font = '13px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#c0b0d8';
+      ctx.fillText(statLabels[s].label, cx + 18, sy + 12);
+      // Stat bar (0–2x scale mapped to full bar at 1.8x)
+      const barX = cx + 100;
+      const barW = cardW - 118;
+      const fraction = Math.min(statLabels[s].val / 1.8, 1);
+      const barColor = statLabels[s].val >= 1.3 ? '#88ff88' : statLabels[s].val >= 0.9 ? '#ffe066' : '#ff8866';
+      _drawBar(ctx, barX, sy + 2, barW, 12, fraction, barColor, barColor, '#1a0830');
+    }
+
+    // Selected checkmark
+    if (isSelected) {
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 18px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#aaffcc';
+      ctx.fillText('✓ Selected', cx + cardW / 2, cardY + cardH - 14);
+    }
+
+    ctx.restore();
+  }
+
+  // Bottom prompt
+  const pulse2 = 0.75 + 0.25 * Math.sin(time * 0.003);
+  ctx.save();
+  ctx.globalAlpha = pulse2;
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 22px "Segoe UI", sans-serif';
+  ctx.fillStyle = '#ffe066';
+  ctx.shadowColor = '#ff9900';
+  ctx.shadowBlur = 14;
+  ctx.strokeStyle = '#3a1800';
+  ctx.lineWidth = 3;
+  const promptText = '▶  Click a card or press ENTER to start  ◀';
+  ctx.strokeText(promptText, w / 2, h - 28);
+  ctx.fillText(promptText, w / 2, h - 28);
   ctx.restore();
 }
 
