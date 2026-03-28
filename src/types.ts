@@ -3,8 +3,10 @@
 // ============================================================
 
 export type EnemyType = 'goose' | 'crow' | 'zombie_chicken' | 'boss';
-export type GameState = 'menu' | 'playing' | 'wave_complete' | 'game_over' | 'victory';
+export type GameState = 'menu' | 'char_select' | 'playing' | 'wave_complete' | 'game_over' | 'victory';
 export type EnemyState = 'idle' | 'chase' | 'attack' | 'stagger' | 'dying' | 'dead';
+export type CharacterType = 'duck' | 'penguin' | 'parrot';
+export type WeaponType = 'sword' | 'axe' | 'spear' | 'dagger' | 'mace';
 
 export interface Vec2 {
   x: number;
@@ -134,3 +136,51 @@ export interface WaveConfig {
   enemies: WaveEnemyConfig[];
   label: string;
 }
+
+// ── Character & Weapon configs ───────────────────────────────
+
+export interface CharacterConfig {
+  type: CharacterType;
+  label: string;
+  description: string;
+  emoji: string;
+  hpMult: number;
+  speedMult: number;
+  damageMult: number;
+  attackCooldownMult: number;
+}
+
+export interface WeaponConfig {
+  type: WeaponType;
+  label: string;
+  emoji: string;
+  damageMult: number;
+  cooldownMult: number;
+  rangeMult: number;
+}
+
+export const CHARACTER_CONFIGS: Record<CharacterType, CharacterConfig> = {
+  duck: {
+    type: 'duck', label: 'Duck', emoji: '🦆',
+    description: 'The balanced warrior. Reliable in every situation.',
+    hpMult: 1.0, speedMult: 1.0, damageMult: 1.0, attackCooldownMult: 1.0,
+  },
+  penguin: {
+    type: 'penguin', label: 'Penguin', emoji: '🐧',
+    description: 'Tanky brawler. High HP and heavy hits, but slow.',
+    hpMult: 1.65, speedMult: 0.68, damageMult: 1.4, attackCooldownMult: 1.2,
+  },
+  parrot: {
+    type: 'parrot', label: 'Parrot', emoji: '🦜',
+    description: 'Swift slasher. Lightning-fast attacks, but fragile.',
+    hpMult: 0.65, speedMult: 1.45, damageMult: 0.75, attackCooldownMult: 0.55,
+  },
+};
+
+export const WEAPON_CONFIGS: Record<WeaponType, WeaponConfig> = {
+  sword:  { type: 'sword',  label: 'Sword',  emoji: '⚔️',  damageMult: 1.0,  cooldownMult: 1.0,  rangeMult: 1.0  },
+  axe:    { type: 'axe',    label: 'Axe',    emoji: '🪓',  damageMult: 1.65, cooldownMult: 1.5,  rangeMult: 0.85 },
+  spear:  { type: 'spear',  label: 'Spear',  emoji: '🗡️',  damageMult: 0.75, cooldownMult: 0.65, rangeMult: 1.5  },
+  dagger: { type: 'dagger', label: 'Dagger', emoji: '🔪',  damageMult: 0.55, cooldownMult: 0.38, rangeMult: 0.7  },
+  mace:   { type: 'mace',   label: 'Mace',   emoji: '🔨',  damageMult: 2.0,  cooldownMult: 2.2,  rangeMult: 0.9  },
+};

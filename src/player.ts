@@ -3,14 +3,15 @@
 // ============================================================
 import type { InputHandler } from './input.ts';
 import type { ParticleSystem } from './particles.ts';
+import { type CharacterType, type WeaponType, CHARACTER_CONFIGS, WEAPON_CONFIGS } from './types.ts';
 
-const PLAYER_SPEED = 210;
-const PLAYER_MAX_HP = 100;
-const ATTACK_COOLDOWN = 0.38;   // seconds
-const ATTACK_DURATION = 0.28;   // seconds
-const ATTACK_RANGE = 92;        // pixels from player center
-const ATTACK_DAMAGE_MIN = 28;
-const ATTACK_DAMAGE_MAX = 42;
+const BASE_SPEED = 210;
+const BASE_MAX_HP = 100;
+const BASE_ATTACK_COOLDOWN = 0.38;   // seconds
+const BASE_ATTACK_DURATION = 0.28;   // seconds
+const BASE_ATTACK_RANGE = 92;        // pixels from player center
+const BASE_DAMAGE_MIN = 28;
+const BASE_DAMAGE_MAX = 42;
 const ROLL_SPEED = 500;
 const ROLL_DURATION = 0.32;
 const ROLL_COOLDOWN = 0.9;
@@ -22,8 +23,8 @@ export class Player {
   y: number;
   vx = 0;
   vy = 0;
-  hp = PLAYER_MAX_HP;
-  maxHp = PLAYER_MAX_HP;
+  hp = BASE_MAX_HP;
+  maxHp = BASE_MAX_HP;
   facing = 1;            // 1 = right, -1 = left
 
   walkFrame = 0;
@@ -47,6 +48,12 @@ export class Player {
 
   dead = false;
 
+  charType: CharacterType = 'duck';
+  weaponType: WeaponType = 'sword';
+  private _speedMult = 1.0;
+  private _damageMult = 1.0;
+  private _cooldownMult = 1.0;
+
   // Canvas bounds
   private _minX = 30;
   private _maxX = 1250;
@@ -59,9 +66,13 @@ export class Player {
   }
 
   get isInvincible() { return this.invincibleTimer > 0; }
-  get attackRange() { return ATTACK_RANGE; }
+  get attackRange() { return BASE_ATTACK_RANGE * WEAPON_CONFIGS[this.weaponType].rangeMult; }
   get attackDamage() {
-    return ATTACK_DAMAGE_MIN + Math.floor(Math.random() * (ATTACK_DAMAGE_MAX - ATTACK_DAMAGE_MIN + 1));
+    const wMult = WEAPON_CONFIGS[this.weaponType].damageMult;
+    const mult = wMult * this._damageMult;
+    const min = Math.round(BASE_DAMAGE_MIN * mult);
+    const max = Math.round(BASE_DAMAGE_MAX * mult);
+    return min + Math.floor(Math.random() * (max - min + 1));
   }
 
   update(dt: number, input: InputHandler, particles: ParticleSystem) {
@@ -88,7 +99,7 @@ export class Player {
     const len = Math.sqrt(mx * mx + my * my);
     if (len > 0) { mx /= len; my /= len; }
 
-    const speed = PLAYER_SPEED;
+    const speed = BASE_SPEED * this._speedMult;
     this.vx += (mx * speed - this.vx) * Math.min(dt * 15, 1);
     this.vy += (my * speed - this.vy) * Math.min(dt * 15, 1);
 
@@ -103,21 +114,22 @@ export class Player {
     }
 
     const wantsAttack = input.mouseClicked || input.keys.has('Space');
+    const effectiveCooldown = BASE_ATTACK_COOLDOWN * this._cooldownMult * WEAPON_CONFIGS[this.weaponType].cooldownMult;
 
     if (!this.isAttacking && this.attackCooldown <= 0 && wantsAttack) {
       this.isAttacking = true;
       this.attackTimer = 0;
-      this.attackCooldown = ATTACK_COOLDOWN;
+      this.attackCooldown = effectiveCooldown;
       // Store the angle toward mouse
       this.attackAngle = Math.atan2(input.mouseY - this.y, input.mouseX - this.x);
       // Slash trail
-      particles.addSlashTrail(this.x, this.y, this.attackAngle, ATTACK_RANGE);
+      particles.addSlashTrail(this.x, this.y, this.attackAngle, this.attackRange);
     }
 
     if (this.isAttacking) {
       this.attackTimer += dt;
-      this.attackProgress = Math.min(this.attackTimer / ATTACK_DURATION, 1);
-      if (this.attackTimer >= ATTACK_DURATION) {
+      this.attackProgress = Math.min(this.attackTimer / BASE_ATTACK_DURATION, 1);
+      if (this.attackTimer >= BASE_ATTACK_DURATION) {
         this.isAttacking = false;
         this.attackProgress = 0;
       }
@@ -224,13 +236,27 @@ export class Player {
     this.walkFrame = 0;
   }
 
+  setCharacter(type: CharacterType) {
+    this.charType = type;
+    const cfg = CHARACTER_CONFIGS[type];
+    this._speedMult = cfg.speedMult;
+    this._damageMult = cfg.damageMult;
+    this._cooldownMult = cfg.attackCooldownMult;
+    this.maxHp = Math.round(BASE_MAX_HP * cfg.hpMult);
+    this.hp = this.maxHp;
+  }
+
+  setWeapon(type: WeaponType) {
+    this.weaponType = type;
+  }
+
   /** True if the attack arc currently overlaps the given position */
   attackHits(ex: number, ey: number): boolean {
     if (!this.isAttacking) return false;
     const dx = ex - this.x;
     const dy = ey - this.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > ATTACK_RANGE * 1.1) return false;
+    if (dist > this.attackRange * 1.1) return false;
 
     // Arc: swing covers 150° centered on attackAngle (mirrored by facing)
     const dirAngle = this.facing >= 0
