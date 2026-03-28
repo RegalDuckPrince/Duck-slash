@@ -6,6 +6,11 @@ import type { EnemyType, BloodPool, BloodParticle, FeatherParticle, BodyPart,
   CharacterType, WeaponType, HpDrop, SkillId } from './types.ts';
 import { CHARACTER_CONFIGS, WEAPON_CONFIGS, SKILL_DEFS } from './types.ts';
 
+// ── Constants ─────────────────────────────────────────────────
+
+/** Angular frequency used for the player dance animation (radians per frame unit) */
+const DANCE_FREQ = 0.18;
+
 // ── Utility ──────────────────────────────────────────────────
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -137,15 +142,15 @@ export function drawPlayer(
 
   // Dance mode – exaggerated bobbing and spinning
   if (isDancing) {
-    const dSpin = Math.sin(danceFrame * 0.12) * 0.35;
-    const dBounce = Math.abs(Math.sin(danceFrame * 0.18)) * -12;
+    const dSpin = Math.sin(danceFrame * (DANCE_FREQ * 0.67)) * 0.35;
+    const dBounce = Math.abs(Math.sin(danceFrame * DANCE_FREQ)) * -12;
     ctx.rotate(dSpin);
-    ctx.translate(Math.sin(danceFrame * 0.09) * 14, dBounce);
+    ctx.translate(Math.sin(danceFrame * (DANCE_FREQ * 0.5)) * 14, dBounce);
   }
 
   const bob = isDancing
-    ? Math.sin(danceFrame * 0.18) * 5
-    : Math.sin(walkFrame * 0.18) * 2.5;
+    ? Math.sin(danceFrame * DANCE_FREQ) * 5
+    : Math.sin(walkFrame * DANCE_FREQ) * 2.5;
 
   // Character colour palette
   let bodyColor1: string, bodyColor2: string, bodyOutline: string,
@@ -232,8 +237,8 @@ export function drawPlayer(
 
   // Wing
   const wf = isRolling ? 0.9
-    : isDancing ? -0.8 + Math.sin(danceFrame * 0.18) * 0.5
-    : Math.sin(walkFrame * 0.18) * 0.25;
+    : isDancing ? -0.8 + Math.sin(danceFrame * DANCE_FREQ) * 0.5
+    : Math.sin(walkFrame * DANCE_FREQ) * 0.25;
   ctx.fillStyle = bodyColor2;
   ctx.save();
   ctx.translate(-8, 0 + bob);

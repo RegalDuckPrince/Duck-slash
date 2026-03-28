@@ -17,6 +17,7 @@ const ROLL_DURATION = 0.32;
 const ROLL_COOLDOWN = 0.9;
 const INVINCIBILITY_AFTER_HIT = 1.4; // seconds
 const COMBO_WINDOW = 1.6;       // seconds between hits to keep combo
+const PROJECTILE_SPREAD_DISTANCE = 200; // px radius used to calculate pellet offsets
 
 export class Player {
   x: number;
@@ -148,8 +149,8 @@ export class Player {
           const offset = count > 1 ? (i / (count - 1) - 0.5) * spread * 2 : 0;
           particles.spawnProjectile(
             this.x, this.y - 20,
-            input.mouseX + Math.cos(this.attackAngle + Math.PI / 2) * offset * 200,
-            input.mouseY + Math.sin(this.attackAngle + Math.PI / 2) * offset * 200,
+            input.mouseX + Math.cos(this.attackAngle + Math.PI / 2) * offset * PROJECTILE_SPREAD_DISTANCE,
+            input.mouseY + Math.sin(this.attackAngle + Math.PI / 2) * offset * PROJECTILE_SPREAD_DISTANCE,
             speed, dmg, false,
           );
         }
@@ -207,13 +208,10 @@ export class Player {
   private _tickTimers(dt: number) {
     if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
     if (this.hitFlash > 0) this.hitFlash -= dt * 3;
-    const comboWindow = COMBO_WINDOW * this.comboWindowMult;
     if (this.comboTimer > 0) {
       this.comboTimer -= dt;
       if (this.comboTimer <= 0) this.combo = 0;
     }
-    // Reset comboTimer proportionally when mult changes (handled at set time)
-    void comboWindow;
   }
 
   private _clamp() {
