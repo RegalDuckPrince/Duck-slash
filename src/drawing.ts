@@ -1441,8 +1441,8 @@ export function drawGameOver(ctx: CanvasRenderingContext2D, w: number, h: number
   ctx.fillStyle = '#ffcccc';
   ctx.strokeStyle = '#2a0000';
   ctx.lineWidth = 3;
-  ctx.strokeText(`You survived ${wave - 1} wave${wave > 2 ? 's' : ''}`, w / 2, h * 0.5);
-  ctx.fillText(`You survived ${wave - 1} wave${wave > 2 ? 's' : ''}`, w / 2, h * 0.5);
+  ctx.strokeText(`You survived ${wave - 1} wave${wave - 1 !== 1 ? 's' : ''}`, w / 2, h * 0.5);
+  ctx.fillText(`You survived ${wave - 1} wave${wave - 1 !== 1 ? 's' : ''}`, w / 2, h * 0.5);
 
   ctx.strokeText(`Final Score: ${score.toLocaleString()}`, w / 2, h * 0.6);
   ctx.fillText(`Final Score: ${score.toLocaleString()}`, w / 2, h * 0.6);
