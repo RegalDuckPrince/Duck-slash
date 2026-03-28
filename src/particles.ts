@@ -198,7 +198,7 @@ export class ParticleSystem {
     });
   }
 
-  spawnProjectile(x: number, y: number, targetX: number, targetY: number, speed: number, damage: number, fromEnemy: boolean) {
+  spawnProjectile(x: number, y: number, targetX: number, targetY: number, speed: number, damage: number, fromEnemy: boolean, splashRadius?: number, isRocket?: boolean, isSaul?: boolean) {
     const angle = Math.atan2(targetY - y, targetX - x);
     this.projectiles.push({
       x, y,
@@ -207,6 +207,9 @@ export class ParticleSystem {
       alpha: 1,
       damage,
       fromEnemy,
+      splashRadius,
+      isRocket,
+      isSaul,
     });
   }
 

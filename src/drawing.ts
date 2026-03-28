@@ -458,6 +458,7 @@ function _drawWeapon(ctx: CanvasRenderingContext2D, weapon: WeaponType, scale: n
     case 'minigun':     _drawMinigun(ctx, scale);     break;
     case 'cannon':      _drawCannon(ctx, scale);      break;
     case 'burst_rifle': _drawBurstRifle(ctx, scale);  break;
+    case 'bazooka':     _drawBazooka(ctx, scale);     break;
     default:            _drawSword(ctx, scale);       break;
   }
 }
@@ -777,6 +778,8 @@ export function drawEnemy(
     case 'crow':  _drawCrow(ctx, walkFrame, staggerAlpha);  break;
     case 'zombie_chicken': _drawZombieChicken(ctx, walkFrame, staggerAlpha); break;
     case 'boss':  _drawBoss(ctx, walkFrame, staggerAlpha, hp, maxHp); break;
+    case 'archer_boss': _drawArcherBoss(ctx, walkFrame, staggerAlpha, hp, maxHp); break;
+    case 'berserker_boss': _drawBerserkerBoss(ctx, walkFrame, staggerAlpha, hp, maxHp); break;
   }
 
   if (staggerAlpha > 0) ctx.restore();
@@ -784,8 +787,10 @@ export function drawEnemy(
 
   // HP bar
   if (dyingAlpha > 0.5 && hp > 0) {
-    const bw = type === 'boss' ? 100 : 50;
-    _drawBar(ctx, x - bw / 2, y - (type === 'boss' ? 90 : 60), bw, 6, hp / maxHp, '#ff3322', '#ff8877', '#200000');
+    const isBoss = type === 'boss' || type === 'archer_boss' || type === 'berserker_boss';
+    const bw = isBoss ? 110 : 50;
+    const barOffY = isBoss ? -100 : -60;
+    _drawBar(ctx, x - bw / 2, y + barOffY, bw, 6, hp / maxHp, '#ff3322', '#ff8877', '#200000');
   }
 }
 
@@ -1477,7 +1482,70 @@ export function drawProjectiles(ctx: CanvasRenderingContext2D, projectiles: Proj
     const angle = Math.atan2(p.vy, p.vx);
     ctx.rotate(angle);
 
-    if (p.fromEnemy) {
+    if (p.isRocket) {
+      // Bazooka rocket – big orange/red missile
+      ctx.shadowColor = '#ff6600';
+      ctx.shadowBlur = 16;
+      // Body
+      ctx.fillStyle = '#cc3300';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 20, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Nose cone
+      ctx.fillStyle = '#ff6600';
+      ctx.beginPath();
+      ctx.moveTo(20, 0);
+      ctx.lineTo(32, -4);
+      ctx.lineTo(32, 4);
+      ctx.closePath();
+      ctx.fill();
+      // Tail fins
+      ctx.fillStyle = '#882200';
+      ctx.beginPath();
+      ctx.moveTo(-20, 0);
+      ctx.lineTo(-28, -8);
+      ctx.lineTo(-22, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-20, 0);
+      ctx.lineTo(-28, 8);
+      ctx.lineTo(-22, 0);
+      ctx.closePath();
+      ctx.fill();
+      // Exhaust flame
+      ctx.shadowColor = '#ffaa00';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#ffaa00';
+      ctx.beginPath();
+      ctx.ellipse(-26, 0, 10, 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(-24, 0, 5, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    } else if (p.isSaul) {
+      // Saul's briefcase projectile
+      ctx.shadowColor = '#aacc88';
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = '#8b6914';
+      roundRect(ctx, -10, -6, 20, 12, 3);
+      ctx.fill();
+      ctx.strokeStyle = '#5a3a00';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-10, -6, 20, 12);
+      // Handle
+      ctx.strokeStyle = '#cc9900';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, -6, 4, Math.PI, Math.PI * 2);
+      ctx.stroke();
+      // Clasp
+      ctx.fillStyle = '#ffcc00';
+      ctx.fillRect(-2, -3, 4, 3);
+      ctx.shadowBlur = 0;
+    } else if (p.fromEnemy) {
       // Feather projectile (enemy)
       ctx.fillStyle = '#c0c0c0';
       ctx.beginPath();
@@ -1627,6 +1695,8 @@ export function drawHUD(
   totalWaves: number,
   comboTimer: number,
   weaponType: WeaponType = 'sword',
+  saulActive = false,
+  upsideDown = false,
 ) {
   ctx.save();
 
@@ -1640,8 +1710,15 @@ export function drawHUD(
   // Weapon indicator
   const wCfg = WEAPON_CONFIGS[weaponType];
   ctx.font = 'bold 14px "Segoe UI", sans-serif';
-  ctx.fillStyle = '#aaddff';
+  ctx.fillStyle = weaponType === 'bazooka' ? '#ff6600' : '#aaddff';
   ctx.fillText(`${wCfg.emoji} ${wCfg.label}`, 18, 68);
+
+  // Saul active indicator
+  if (saulActive) {
+    ctx.font = 'bold 13px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#aaffcc';
+    ctx.fillText('⚖️ Saul on your side!', 18, 88);
+  }
 
   // Score
   ctx.textAlign = 'right';
@@ -1660,6 +1737,14 @@ export function drawHUD(
   ctx.lineWidth = 3;
   ctx.strokeText(`Wave ${wave} / ${totalWaves}`, w / 2, 28);
   ctx.fillText(`Wave ${wave} / ${totalWaves}`, w / 2, 28);
+
+  // Upside-down indicator (small badge)
+  if (upsideDown) {
+    ctx.font = 'bold 13px "Segoe UI", sans-serif';
+    ctx.fillStyle = '#cc88ff';
+    ctx.textAlign = 'center';
+    ctx.fillText('🙃 UPSIDE DOWN MODE 🙃', w / 2, 48);
+  }
 
   ctx.restore();
 }
@@ -2235,5 +2320,775 @@ export function drawSkillTree(
   ctx.font = '16px "Segoe UI", sans-serif';
   ctx.fillStyle = '#c0b0d8';
   ctx.fillText('Click a card to claim your upgrade', w / 2, h - 22);
+  ctx.restore();
+}
+
+// ── Bazooka weapon ───────────────────────────────────────────
+
+function _drawBazooka(ctx: CanvasRenderingContext2D, scale: number) {
+  ctx.save();
+  ctx.scale(scale, scale);
+  ctx.shadowColor = '#ff6600';
+  ctx.shadowBlur = 16;
+
+  // Main tube (fat, long)
+  const tubeGrad = ctx.createLinearGradient(-10, 0, 10, 0);
+  tubeGrad.addColorStop(0, '#555');
+  tubeGrad.addColorStop(0.5, '#999');
+  tubeGrad.addColorStop(1, '#444');
+  ctx.fillStyle = tubeGrad;
+  roundRect(ctx, -9, -88, 18, 74, 5);
+  ctx.fill();
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(-9, -88, 18, 74);
+
+  // Muzzle bell
+  ctx.fillStyle = '#777';
+  roundRect(ctx, -11, -92, 22, 10, 4);
+  ctx.fill();
+
+  // Rear exhaust port
+  ctx.fillStyle = '#222';
+  ctx.beginPath();
+  ctx.arc(0, -14, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowColor = '#ff8800';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#ff6600';
+  ctx.beginPath();
+  ctx.arc(0, -14, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Grip
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#5a3010';
+  roundRect(ctx, -4, -4, 8, 22, 3);
+  ctx.fill();
+
+  // Sights (crosshair)
+  ctx.strokeStyle = '#cc4400';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-14, -70);
+  ctx.lineTo(14, -70);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, -82);
+  ctx.lineTo(0, -58);
+  ctx.stroke();
+
+  // Rocket in tube hint
+  ctx.fillStyle = '#cc3300';
+  ctx.beginPath();
+  ctx.arc(0, -80, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ff5500';
+  ctx.beginPath();
+  ctx.arc(0, -80, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+// ── Archer Boss ──────────────────────────────────────────────
+
+function _drawArcherBoss(ctx: CanvasRenderingContext2D, frame: number, hit: number, hp: number, maxHp: number) {
+  const bob = Math.sin(frame * 0.09) * 3;
+  const hpFrac = hp / maxHp;
+  const enraged = hpFrac < 0.4;
+
+  if (hit > 0) {
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 40 * hit;
+  }
+
+  ctx.save();
+  ctx.scale(1.7, 1.7);
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(0, 44, 28, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Feet
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  const fw = Math.sin(frame * 0.09) * 7;
+  for (const [ox, f] of [[-8, fw], [8, -fw]] as [number, number][]) {
+    ctx.beginPath();
+    ctx.moveTo(ox, 38);
+    ctx.lineTo(ox + f, 50);
+    ctx.stroke();
+    for (const ta of [-0.4, 0, 0.4]) {
+      ctx.beginPath();
+      ctx.moveTo(ox + f, 50);
+      ctx.lineTo(ox + f + Math.cos(ta + 1.2) * 10, 50 + Math.sin(ta + 1.2) * 6);
+      ctx.stroke();
+    }
+  }
+
+  // Body (dark armored crow look)
+  const bColor = enraged ? '#1a0a2e' : '#1a1a2e';
+  const bodyGrad = ctx.createRadialGradient(0, 5, 3, 4, 5 + bob, 30);
+  bodyGrad.addColorStop(0, enraged ? '#330044' : '#252535');
+  bodyGrad.addColorStop(1, bColor);
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 10 + bob, 26, 32, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = enraged ? '#880088' : '#404050';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Armor plates
+  ctx.fillStyle = enraged ? '#440066' : '#2a2a44';
+  ctx.beginPath();
+  ctx.ellipse(0, 6 + bob, 18, 22, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Wings (menacing spread)
+  ctx.fillStyle = enraged ? '#220033' : '#151525';
+  ctx.save();
+  ctx.translate(-14, 0 + bob);
+  ctx.rotate(Math.sin(frame * 0.09) * 0.3 - 0.4);
+  ctx.beginPath();
+  ctx.moveTo(0, -6);
+  ctx.lineTo(-22, 6);
+  ctx.lineTo(-16, 22);
+  ctx.lineTo(0, 16);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Head
+  const headGrad = ctx.createRadialGradient(4, -24, 2, 4, -24 + bob, 16);
+  headGrad.addColorStop(0, enraged ? '#3a0055' : '#252535');
+  headGrad.addColorStop(1, enraged ? '#1a0033' : '#1a1a2e');
+  ctx.fillStyle = headGrad;
+  ctx.beginPath();
+  ctx.arc(4, -24 + bob, 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = enraged ? '#880088' : '#404050';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Glowing eyes (purple/violet when enraged)
+  ctx.shadowColor = enraged ? '#ff00ff' : '#8800ff';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = enraged ? '#ff00ff' : '#aa00ff';
+  ctx.beginPath();
+  ctx.arc(11, -27 + bob, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1a0022';
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.arc(12, -27 + bob, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Beak
+  ctx.fillStyle = '#333340';
+  ctx.beginPath();
+  ctx.moveTo(18, -24 + bob);
+  ctx.lineTo(30, -27 + bob);
+  ctx.lineTo(28, -21 + bob);
+  ctx.closePath();
+  ctx.fill();
+
+  // Quiver on back
+  ctx.fillStyle = '#7a4420';
+  roundRect(ctx, -18, -45 + bob, 8, 28, 3);
+  ctx.fill();
+  ctx.strokeStyle = '#4a2810';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-18, -45 + bob, 8, 28);
+  // Arrows in quiver
+  ctx.strokeStyle = '#aaaaaa';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-17 + i * 2, -45 + bob);
+    ctx.lineTo(-17 + i * 2, -58 + bob);
+    ctx.stroke();
+    ctx.fillStyle = '#cc4400';
+    ctx.beginPath();
+    ctx.arc(-17 + i * 2, -58 + bob, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+  ctx.shadowBlur = 0;
+}
+
+// ── Berserker Boss ───────────────────────────────────────────
+
+function _drawBerserkerBoss(ctx: CanvasRenderingContext2D, frame: number, hit: number, hp: number, maxHp: number) {
+  const hpFrac = hp / maxHp;
+  const rage = hpFrac < 0.25;
+  const enraged = hpFrac < 0.5;
+  const bob = Math.sin(frame * 0.13) * 5;
+  const wobble = enraged ? Math.sin(frame * 0.18) * 0.12 : 0;
+
+  if (hit > 0) {
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 50 * hit;
+  }
+
+  ctx.save();
+  ctx.scale(2.0, 2.0);
+  ctx.rotate(wobble);
+
+  // Shadow (massive)
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.beginPath();
+  ctx.ellipse(0, 46, 36, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Feet (huge)
+  ctx.strokeStyle = '#886644';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  const fw = Math.sin(frame * 0.13) * 8;
+  for (const [ox, f] of [[-10, fw], [10, -fw]] as [number, number][]) {
+    ctx.beginPath();
+    ctx.moveTo(ox, 40);
+    ctx.lineTo(ox + f, 54);
+    ctx.stroke();
+    for (const ta of [-0.35, 0, 0.35]) {
+      ctx.beginPath();
+      ctx.moveTo(ox + f, 54);
+      ctx.lineTo(ox + f + Math.cos(ta + 1.2) * 11, 54 + Math.sin(ta + 1.2) * 6);
+      ctx.stroke();
+    }
+  }
+
+  // Body (bulging, muscle-y)
+  const bColor0 = rage ? '#8a3800' : enraged ? '#7a5530' : '#8a7a50';
+  const bColor1 = rage ? '#4a1800' : enraged ? '#4a3010' : '#5a4a20';
+  const bodyGrad = ctx.createRadialGradient(0, 5, 4, 4, 5 + bob, 36);
+  bodyGrad.addColorStop(0, bColor0);
+  bodyGrad.addColorStop(1, bColor1);
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 12 + bob, 32, 38, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = rage ? '#660000' : '#4a3000';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Scars
+  ctx.strokeStyle = rage ? '#cc0000' : 'rgba(50,20,0,0.6)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-8, -10 + bob);
+  ctx.lineTo(2, 10 + bob);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(5, -5 + bob);
+  ctx.lineTo(-2, 15 + bob);
+  ctx.stroke();
+
+  // Wings (tattered)
+  ctx.fillStyle = rage ? '#5a1500' : enraged ? '#4a2800' : '#3a2810';
+  ctx.save();
+  ctx.translate(-18, 0 + bob);
+  ctx.rotate(Math.sin(frame * 0.13) * 0.35 - 0.3);
+  ctx.beginPath();
+  ctx.moveTo(0, -8);
+  ctx.lineTo(-26, 4);
+  ctx.lineTo(-20, 26);
+  ctx.lineTo(0, 18);
+  ctx.closePath();
+  ctx.fill();
+  // Tatter marks
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-10 - i * 5, -2 + i * 4);
+    ctx.lineTo(-14 - i * 5, 8 + i * 4);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Head (huge, scarred)
+  const headGrad2 = ctx.createRadialGradient(6, -26, 3, 6, -26 + bob, 22);
+  headGrad2.addColorStop(0, rage ? '#aa3300' : enraged ? '#8a5520' : '#8a7a50');
+  headGrad2.addColorStop(1, rage ? '#5a0000' : '#4a2800');
+  ctx.fillStyle = headGrad2;
+  ctx.beginPath();
+  ctx.arc(6, -26 + bob, 22, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = rage ? '#880000' : '#4a3000';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Mohawk / crest (spiky)
+  ctx.fillStyle = rage ? '#ff2200' : '#cc6600';
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-8 + i * 4, -40 + bob);
+    ctx.lineTo(-6 + i * 4, -52 + bob - i * 2);
+    ctx.lineTo(-4 + i * 4, -40 + bob);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Eyes – glowing red rage
+  ctx.shadowColor = '#ff0000';
+  ctx.shadowBlur = rage ? 20 : 10;
+  ctx.fillStyle = '#ff2222';
+  ctx.beginPath();
+  ctx.arc(15, -30 + bob, rage ? 8 : 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#1a0000';
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.arc(16, -30 + bob, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Beak (thick, broken)
+  ctx.fillStyle = '#cc6600';
+  ctx.beginPath();
+  ctx.moveTo(24, -26 + bob);
+  ctx.lineTo(40, -30 + bob);
+  ctx.lineTo(38, -22 + bob);
+  ctx.lineTo(24, -24 + bob);
+  ctx.closePath();
+  ctx.fill();
+  // chunk missing
+  ctx.fillStyle = rage ? '#5a0000' : '#3a2800';
+  ctx.beginPath();
+  ctx.arc(36, -26 + bob, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Axes (both sides)
+  for (const side of [-1, 1] as const) {
+    ctx.save();
+    ctx.translate(side * 24, -5 + bob);
+    ctx.rotate(side * 0.3 + Math.sin(frame * 0.13) * 0.2);
+    // handle
+    ctx.fillStyle = '#7a4420';
+    roundRect(ctx, -3, -36, 6, 54, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#4a2810';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // axe head
+    ctx.fillStyle = '#999';
+    ctx.beginPath();
+    ctx.moveTo(side > 0 ? -3 : 3, -36);
+    ctx.lineTo(side > 0 ? -22 : 22, -50);
+    ctx.lineTo(side > 0 ? -18 : 18, -30);
+    ctx.lineTo(side > 0 ? -3 : 3, -24);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#666';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    // blood on axe
+    ctx.fillStyle = '#cc0000';
+    ctx.beginPath();
+    ctx.arc(side > 0 ? -18 : 18, -44, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+  ctx.shadowBlur = 0;
+}
+
+// ── Saul Goodman Ally ────────────────────────────────────────
+
+export function drawSaulAlly(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  facing: number,
+  walkFrame: number,
+  hp: number,
+  maxHp: number,
+  alpha: number,
+) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+  if (facing < 0) ctx.scale(-1, 1);
+
+  const bob = Math.sin(walkFrame * 0.18) * 2;
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.18)';
+  ctx.beginPath();
+  ctx.ellipse(0, 32, 18, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Legs
+  ctx.strokeStyle = '#8b6914';
+  ctx.lineWidth = 7;
+  ctx.lineCap = 'round';
+  const lfw = Math.sin(walkFrame * 0.18) * 7;
+  ctx.beginPath();
+  ctx.moveTo(-6, 18 + bob);
+  ctx.lineTo(-6 + lfw, 32 + bob);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(6, 18 + bob);
+  ctx.lineTo(6 - lfw, 32 + bob);
+  ctx.stroke();
+  // Shoes
+  ctx.fillStyle = '#2a1800';
+  ctx.beginPath();
+  ctx.ellipse(-6 + lfw, 34 + bob, 7, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(6 - lfw, 34 + bob, 7, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Suit body (Saul's iconic yellow-green suit)
+  const suitGrad = ctx.createLinearGradient(-14, -10, 14, 20);
+  suitGrad.addColorStop(0, '#c8b832');
+  suitGrad.addColorStop(0.5, '#a89820');
+  suitGrad.addColorStop(1, '#887810');
+  ctx.fillStyle = suitGrad;
+  ctx.beginPath();
+  ctx.moveTo(-14, -8 + bob);
+  ctx.lineTo(-16, 18 + bob);
+  ctx.lineTo(16, 18 + bob);
+  ctx.lineTo(14, -8 + bob);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#6a5a00';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Shirt / tie
+  ctx.fillStyle = '#f0f0f0';
+  ctx.beginPath();
+  ctx.moveTo(-5, -8 + bob);
+  ctx.lineTo(-4, 18 + bob);
+  ctx.lineTo(4, 18 + bob);
+  ctx.lineTo(5, -8 + bob);
+  ctx.closePath();
+  ctx.fill();
+  // Tie (red)
+  ctx.fillStyle = '#cc2222';
+  ctx.beginPath();
+  ctx.moveTo(-2, -6 + bob);
+  ctx.lineTo(-3, 14 + bob);
+  ctx.lineTo(0, 18 + bob);
+  ctx.lineTo(3, 14 + bob);
+  ctx.lineTo(2, -6 + bob);
+  ctx.closePath();
+  ctx.fill();
+
+  // Arms
+  ctx.strokeStyle = '#c8b832';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
+  // Left arm (holding briefcase)
+  ctx.beginPath();
+  ctx.moveTo(-14, -4 + bob);
+  ctx.lineTo(-22, 8 + bob);
+  ctx.stroke();
+  // Right arm
+  const armSwing = Math.sin(walkFrame * 0.18) * 0.3;
+  ctx.beginPath();
+  ctx.moveTo(14, -4 + bob);
+  ctx.lineTo(14 + Math.cos(armSwing) * 10, 8 + Math.sin(armSwing) * 5 + bob);
+  ctx.stroke();
+
+  // Briefcase (left hand)
+  ctx.save();
+  ctx.translate(-22, 10 + bob);
+  ctx.fillStyle = '#8b6914';
+  roundRect(ctx, -10, -5, 20, 12, 3);
+  ctx.fill();
+  ctx.strokeStyle = '#5a3a00';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(-10, -5, 20, 12);
+  ctx.strokeStyle = '#cc9900';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, -5, 4, Math.PI, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#ffcc00';
+  ctx.fillRect(-2, -2, 4, 3);
+  ctx.restore();
+
+  // Head
+  ctx.fillStyle = '#e8c89a';
+  ctx.beginPath();
+  ctx.arc(2, -20 + bob, 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#c8a070';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Hair (dark, side-parted)
+  ctx.fillStyle = '#2a1a0a';
+  ctx.beginPath();
+  ctx.ellipse(2, -32 + bob, 14, 8, 0, Math.PI, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(-6, -28 + bob, 8, 6, -0.3, Math.PI, Math.PI * 2);
+  ctx.fill();
+
+  // Eyes
+  ctx.fillStyle = 'white';
+  ctx.beginPath();
+  ctx.arc(-4, -21 + bob, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(8, -21 + bob, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#3a2800';
+  ctx.beginPath();
+  ctx.arc(-3, -21 + bob, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(9, -21 + bob, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  // Glasses
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(-4, -21 + bob, 5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(8, -21 + bob, 5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-9, -21 + bob);
+  ctx.lineTo(-14, -22 + bob);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(13, -21 + bob);
+  ctx.lineTo(18, -22 + bob);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(1, -21 + bob);
+  ctx.lineTo(3, -21 + bob);
+  ctx.stroke();
+
+  // Smug smile
+  ctx.strokeStyle = '#7a4420';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(2, -16 + bob, 5, 0.1, Math.PI - 0.1);
+  ctx.stroke();
+
+  // "⚖️" badge on lapel
+  ctx.font = 'bold 10px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffcc00';
+  ctx.fillText('⚖️', -9, 5 + bob);
+
+  ctx.restore();
+
+  // HP bar above Saul
+  _drawBar(ctx, x - 30, y - 60, 60, 7, hp / maxHp, '#aaffcc', '#88ff88', '#002210');
+
+  // Label
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 11px "Segoe UI", sans-serif';
+  ctx.fillStyle = '#aaffcc';
+  ctx.strokeStyle = '#001a08';
+  ctx.lineWidth = 2;
+  ctx.strokeText('Saul ⚖️', x, y - 65);
+  ctx.fillText('Saul ⚖️', x, y - 65);
+  ctx.restore();
+}
+
+// ── Shop screen ───────────────────────────────────────────────
+
+export function drawShop(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  items: import('./types.ts').ShopItem[],
+  hoveredIdx: number,
+  score: number,
+  time: number,
+) {
+  // Background overlay
+  const bg = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.7);
+  bg.addColorStop(0, 'rgba(10,5,30,0.94)');
+  bg.addColorStop(1, 'rgba(2,1,8,0.98)');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  // Stars
+  for (let i = 0; i < 50; i++) {
+    const sx = (i * 239 + 17) % w;
+    const sy = (i * 313 + 31) % (h * 0.9);
+    const blink = 0.3 + 0.7 * Math.sin(time * 0.001 * (1 + (i % 5) * 0.3) + i);
+    ctx.globalAlpha = blink * 0.6;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(sx, sy, 1 + (i % 3) * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Title
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#ffcc00';
+  ctx.shadowBlur = 30;
+  ctx.font = 'bold 56px "Segoe UI Black", "Segoe UI", sans-serif';
+  ctx.fillStyle = '#ffe066';
+  ctx.strokeStyle = '#4a2000';
+  ctx.lineWidth = 5;
+  ctx.strokeText('🛒 SHOP 🛒', w / 2, 72);
+  ctx.fillText('🛒 SHOP 🛒', w / 2, 72);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+
+  // Score display
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 22px "Segoe UI", sans-serif';
+  ctx.fillStyle = '#ffe066';
+  ctx.fillText(`⭐ Your Points: ${score.toLocaleString()}`, w / 2, 108);
+  ctx.restore();
+
+  // Items grid
+  const itemW = 200, itemH = 160, gap = 20;
+  const cols = 3;
+  const totalW = cols * itemW + (cols - 1) * gap;
+  const startX = (w - totalW) / 2;
+  const startY = h / 2 - 180;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const ix = startX + col * (itemW + gap);
+    const iy = startY + row * (itemH + gap);
+    const isHovered = i === hoveredIdx;
+    const canAfford = score >= item.cost;
+    const pulse = 0.85 + 0.15 * Math.sin(time * 0.005 + i * 1.5);
+
+    ctx.save();
+
+    if (isHovered && canAfford) {
+      ctx.shadowColor = item.isGamble ? '#ff9900' : '#aaffcc';
+      ctx.shadowBlur = 24 * pulse;
+    }
+
+    // Card background
+    const cardGrad = ctx.createLinearGradient(ix, iy, ix, iy + itemH);
+    if (isHovered && canAfford) {
+      cardGrad.addColorStop(0, item.isGamble ? 'rgba(80,40,5,0.97)' : 'rgba(10,60,30,0.97)');
+      cardGrad.addColorStop(1, item.isGamble ? 'rgba(40,20,0,0.97)' : 'rgba(5,30,15,0.97)');
+    } else if (!canAfford) {
+      cardGrad.addColorStop(0, 'rgba(30,15,15,0.7)');
+      cardGrad.addColorStop(1, 'rgba(15,5,5,0.7)');
+    } else {
+      cardGrad.addColorStop(0, item.isGamble ? 'rgba(50,30,5,0.88)' : 'rgba(20,40,30,0.88)');
+      cardGrad.addColorStop(1, item.isGamble ? 'rgba(25,15,0,0.88)' : 'rgba(8,20,12,0.88)');
+    }
+    ctx.fillStyle = cardGrad;
+    roundRect(ctx, ix, iy, itemW, itemH, 14);
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = canAfford
+      ? (isHovered ? (item.isGamble ? '#ff9900' : '#aaffcc') : (item.isGamble ? '#cc6600' : '#448844'))
+      : '#443333';
+    ctx.lineWidth = isHovered ? 3 : 1.5;
+    roundRect(ctx, ix, iy, itemW, itemH, 14);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    // Emoji
+    ctx.font = '40px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(item.emoji, ix + itemW / 2, iy + 52);
+
+    // Name
+    ctx.font = 'bold 16px "Segoe UI", sans-serif';
+    ctx.fillStyle = canAfford ? (isHovered ? '#ffffff' : '#e0e0e0') : '#888888';
+    ctx.fillText(item.label, ix + itemW / 2, iy + 78);
+
+    // Description
+    ctx.font = '12px "Segoe UI", sans-serif';
+    ctx.fillStyle = canAfford ? (item.isGamble ? '#ffaa44' : '#99dd99') : '#666666';
+    ctx.fillText(item.description, ix + itemW / 2, iy + 98);
+
+    // Cost
+    const costColor = canAfford ? '#ffe066' : '#ff4444';
+    ctx.font = 'bold 15px "Segoe UI", sans-serif';
+    ctx.fillStyle = costColor;
+    ctx.fillText(`⭐ ${item.cost} pts`, ix + itemW / 2, iy + 122);
+
+    // Can't afford overlay
+    if (!canAfford) {
+      ctx.font = 'bold 13px "Segoe UI", sans-serif';
+      ctx.fillStyle = '#ff4444';
+      ctx.fillText('Not enough! 💸', ix + itemW / 2, iy + itemH - 12);
+    } else if (isHovered) {
+      ctx.font = 'bold 13px "Segoe UI", sans-serif';
+      ctx.fillStyle = item.isGamble ? '#ffcc44' : '#aaffcc';
+      ctx.fillText(item.isGamble ? '🎲 Take the risk!' : '✓ Click to buy!', ix + itemW / 2, iy + itemH - 12);
+    }
+
+    ctx.restore();
+  }
+
+  // Leave / continue button
+  const btnX = w / 2 - 120;
+  const btnY = h - 90;
+  const btnPulse = 0.8 + 0.2 * Math.sin(time * 0.004);
+  ctx.save();
+  ctx.globalAlpha = btnPulse;
+  ctx.shadowColor = '#aaffcc';
+  ctx.shadowBlur = 16;
+  const btnGrad = ctx.createLinearGradient(btnX, btnY, btnX, btnY + 50);
+  btnGrad.addColorStop(0, 'rgba(20,80,40,0.95)');
+  btnGrad.addColorStop(1, 'rgba(8,40,20,0.95)');
+  ctx.fillStyle = btnGrad;
+  roundRect(ctx, btnX, btnY, 240, 50, 12);
+  ctx.fill();
+  ctx.strokeStyle = '#44cc66';
+  ctx.lineWidth = 2;
+  roundRect(ctx, btnX, btnY, 240, 50, 12);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.font = 'bold 18px "Segoe UI", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#aaffcc';
+  ctx.fillText('✅ Leave Shop (Enter)', w / 2, btnY + 31);
+  ctx.restore();
+}
+
+// ── Upside-down banner ───────────────────────────────────────
+
+export function drawUpsideDownBanner(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  time: number,
+) {
+  // This banner is drawn while the canvas is flipped, so it appears right-side-up
+  // by being drawn upside-down in the flipped context
+  ctx.save();
+  // Un-flip just for this banner text (it's at the bottom after the flip)
+  ctx.translate(w / 2, h - 30);
+  ctx.scale(1, -1);
+  ctx.textAlign = 'center';
+  const pulse = 0.7 + 0.3 * Math.sin(time * 0.006);
+  ctx.globalAlpha = pulse;
+  ctx.font = 'bold 16px "Segoe UI", sans-serif';
+  ctx.fillStyle = '#cc88ff';
+  ctx.strokeStyle = '#220044';
+  ctx.lineWidth = 3;
+  ctx.strokeText('🙃 UPSIDE DOWN MODE 🙃', 0, 0);
+  ctx.fillText('🙃 UPSIDE DOWN MODE 🙃', 0, 0);
   ctx.restore();
 }
