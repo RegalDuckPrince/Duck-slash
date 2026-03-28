@@ -1,0 +1,25 @@
+{
+  "name": "duck-slash",
+  "version": "1.0.0",
+  "description": "warning gory",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RegalDuckPrince/Duck-slash.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/RegalDuckPrince/Duck-slash/issues"
+  },
+  "homepage": "https://github.com/RegalDuckPrince/Duck-slash#readme",
+  "devDependencies": {
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3"
+  }
+}
