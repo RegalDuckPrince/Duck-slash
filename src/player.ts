@@ -3,7 +3,7 @@
 // ============================================================
 import type { InputHandler } from './input.ts';
 import type { ParticleSystem } from './particles.ts';
-import { type CharacterType, type WeaponType, CHARACTER_CONFIGS, WEAPON_CONFIGS } from './types.ts';
+import { type CharacterType, type WeaponType, type SkillId, CHARACTER_CONFIGS, WEAPON_CONFIGS } from './types.ts';
 
 const BASE_SPEED = 210;
 const BASE_MAX_HP = 100;
@@ -48,11 +48,20 @@ export class Player {
 
   dead = false;
 
+  // Dance state (used during wave_complete)
+  isDancing = false;
+  danceFrame = 0;
+
   charType: CharacterType = 'duck';
   weaponType: WeaponType = 'sword';
   private _speedMult = 1.0;
   private _damageMult = 1.0;
   private _cooldownMult = 1.0;
+  private _rangeMult = 1.0;
+  private _armorMult = 1.0;     // multiplier applied to incoming damage
+  comboWindowMult = 1.0;
+  lifestealPct = 0;
+  doubleShot = false;
 
   // Canvas bounds
   private _minX = 30;
@@ -66,7 +75,7 @@ export class Player {
   }
 
   get isInvincible() { return this.invincibleTimer > 0; }
-  get attackRange() { return BASE_ATTACK_RANGE * WEAPON_CONFIGS[this.weaponType].rangeMult; }
+  get attackRange() { return BASE_ATTACK_RANGE * WEAPON_CONFIGS[this.weaponType].rangeMult * this._rangeMult; }
   get attackDamage() {
     const wMult = WEAPON_CONFIGS[this.weaponType].damageMult;
     const mult = wMult * this._damageMult;
@@ -77,6 +86,11 @@ export class Player {
 
   update(dt: number, input: InputHandler, particles: ParticleSystem) {
     if (this.dead) return;
+
+    if (this.isDancing) {
+      this.danceFrame += dt * 60;
+      return; // freeze movement while dancing
+    }
 
     this._handleMovement(dt, input);
     this._handleAttack(dt, input, particles);
@@ -115,6 +129,7 @@ export class Player {
 
     const wantsAttack = input.mouseClicked || input.keys.has('Space');
     const effectiveCooldown = BASE_ATTACK_COOLDOWN * this._cooldownMult * WEAPON_CONFIGS[this.weaponType].cooldownMult;
+    const wCfg = WEAPON_CONFIGS[this.weaponType];
 
     if (!this.isAttacking && this.attackCooldown <= 0 && wantsAttack) {
       this.isAttacking = true;
@@ -122,8 +137,26 @@ export class Player {
       this.attackCooldown = effectiveCooldown;
       // Store the angle toward mouse
       this.attackAngle = Math.atan2(input.mouseY - this.y, input.mouseX - this.x);
-      // Slash trail
-      particles.addSlashTrail(this.x, this.y, this.attackAngle, this.attackRange);
+
+      if (wCfg.isGun) {
+        // Fire projectile(s) toward cursor
+        const count = (wCfg.projectileCount ?? 1) + (this.doubleShot ? 1 : 0);
+        const spread = wCfg.projectileSpread ?? 0;
+        const speed = wCfg.projectileSpeed ?? 14;
+        const dmg = this.attackDamage;
+        for (let i = 0; i < count; i++) {
+          const offset = count > 1 ? (i / (count - 1) - 0.5) * spread * 2 : 0;
+          particles.spawnProjectile(
+            this.x, this.y - 20,
+            input.mouseX + Math.cos(this.attackAngle + Math.PI / 2) * offset * 200,
+            input.mouseY + Math.sin(this.attackAngle + Math.PI / 2) * offset * 200,
+            speed, dmg, false,
+          );
+        }
+      } else {
+        // Slash trail for melee
+        particles.addSlashTrail(this.x, this.y, this.attackAngle, this.attackRange);
+      }
     }
 
     if (this.isAttacking) {
@@ -174,10 +207,13 @@ export class Player {
   private _tickTimers(dt: number) {
     if (this.invincibleTimer > 0) this.invincibleTimer -= dt;
     if (this.hitFlash > 0) this.hitFlash -= dt * 3;
+    const comboWindow = COMBO_WINDOW * this.comboWindowMult;
     if (this.comboTimer > 0) {
       this.comboTimer -= dt;
       if (this.comboTimer <= 0) this.combo = 0;
     }
+    // Reset comboTimer proportionally when mult changes (handled at set time)
+    void comboWindow;
   }
 
   private _clamp() {
@@ -190,7 +226,7 @@ export class Player {
   /** Called when player is hit. Returns whether damage was taken. */
   takeDamage(amount: number): boolean {
     if (this.isInvincible || this.dead) return false;
-    this.hp -= amount;
+    this.hp -= Math.round(amount * this._armorMult);
     this.hitFlash = 1;
     this.invincibleTimer = INVINCIBILITY_AFTER_HIT;
     if (this.hp <= 0) {
@@ -207,7 +243,7 @@ export class Player {
   /** Register a successful hit for combo tracking */
   registerHit(particles: ParticleSystem, hitX: number, hitY: number) {
     this.combo++;
-    this.comboTimer = COMBO_WINDOW;
+    this.comboTimer = COMBO_WINDOW * this.comboWindowMult;
 
     const comboMilestones: Record<number, string> = {
       3: '3x COMBO!',
@@ -234,6 +270,16 @@ export class Player {
     this.invincibleTimer = 0; this.hitFlash = 0;
     this.dead = false;
     this.walkFrame = 0;
+    this.isDancing = false; this.danceFrame = 0;
+    // Reset skill bonuses
+    this._speedMult = 1.0;
+    this._damageMult = 1.0;
+    this._cooldownMult = 1.0;
+    this._rangeMult = 1.0;
+    this._armorMult = 1.0;
+    this.comboWindowMult = 1.0;
+    this.lifestealPct = 0;
+    this.doubleShot = false;
   }
 
   setCharacter(type: CharacterType) {
@@ -250,9 +296,25 @@ export class Player {
     this.weaponType = type;
   }
 
-  /** True if the attack arc currently overlaps the given position */
+  /** Apply a skill upgrade */
+  applySkill(id: SkillId) {
+    switch (id) {
+      case 'sharp_claws':   this._damageMult   *= 1.25; break;
+      case 'duck_boost':    this._speedMult    *= 1.20; break;
+      case 'iron_feathers': this.maxHp += 30; this.hp = Math.min(this.maxHp, this.hp + 30); break;
+      case 'swift_wings':   this._cooldownMult *= 0.75; break;
+      case 'long_reach':    this._rangeMult    *= 1.30; break;
+      case 'lifesteal':     this.lifestealPct  += 0.08; break;
+      case 'armor':         this._armorMult    *= 0.80; break;
+      case 'battle_frenzy': this.comboWindowMult *= 1.50; break;
+      case 'double_shot':   this.doubleShot = true; break;
+    }
+  }
+
+  /** True if the attack arc currently overlaps the given position (melee only) */
   attackHits(ex: number, ey: number): boolean {
     if (!this.isAttacking) return false;
+    if (WEAPON_CONFIGS[this.weaponType].isGun) return false; // guns use projectiles
     const dx = ex - this.x;
     const dy = ey - this.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
